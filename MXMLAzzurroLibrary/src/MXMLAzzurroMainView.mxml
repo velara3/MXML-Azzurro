@@ -116,8 +116,8 @@
 			protected function view_creationCompleteHandler(event:FlexEvent):void {
 				//parentApplication.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, uncaughtErrorHandler);
 				Radiate.preventDefaultMessages = false;
-				ExternalInterface.marshallExceptions = true;
-				AceEditor.debug = true;
+				ExternalInterface.marshallExceptions = false;
+				AceEditor.debug = false;
 				
 				ClassLoader.debug = debug;
 				classLoader = new ClassLoader();
@@ -352,6 +352,8 @@
 			
 			/**
 			 * When you use the browserManager.setFragment() method to change the URL, you trigger an applicationURLChange event.
+			 * We keep this method to check the url after user saves
+			 * Otherwise use browserURLchange
 			 **/
 			private function applicationURLChange(event:BrowserChangeEvent):void {
 				var fragment:String = browserManager.fragment;
@@ -936,7 +938,12 @@
 			private var saveService:WPService;
 			private var saveSuccessful:Boolean;
 			private var saveInProgress:Boolean;
+			private var loadSuccessful:Boolean;
+			private var loadInProgress:Boolean;
 			
+			/**
+			 * Saves the snippet to the server
+			 * */
 			private function postDocument():void {
 				var form:URLVariables;
 				
@@ -983,6 +990,8 @@
 				var saveResultsEvent:SaveResultsEvent = new SaveResultsEvent(SaveResultsEvent.SAVE_RESULTS);
 				var data:Object = event.data;
 				var post:Object = data ? data.post : null;
+				var pathElements:Array;
+				var key:String;
 				
 				saveResultsEvent.call = event.call;
 				saveResultsEvent.data = event.data;
@@ -993,11 +1002,23 @@
 					var uri:String = post.url;
 					var status:String = post.status;
 					savingStatus.text = "Snippet saved";
-					browserManager.setFragment(post.id);
+					
+					//pathElements = uri.split("/");
+					//key = pathElements[pathElements.length-2];
+					var result:Array = uri.match(/(\w+)\/?$/);
+					if (result!=null) {
+						browserManager.setFragment(result[1]);
+					}
+					else {
+						browserManager.setFragment(post.id);
+					}
 					
 					saveSuccessful = true;
 				}
 				else {
+					// you may need to be on the server, may need https, 
+					// use file:// when testing locally 
+					// or an error in the php 
 					savingStatus.text = "Not saved";
 					saveSuccessful = false;
 				}
@@ -1117,14 +1138,41 @@
 					loadService.host = host;
 					loadService.addEventListener(WPServiceEvent.RESULT, loadResultsHandler);
 					loadService.addEventListener(WPServiceEvent.FAULT, loadFaultHandler);
-				}	
+				}
 			}
 			
+			/**
+			 * Check the URL when the page loads to see if there is a post
+			 * */
 			private function browserURLChange(event:BrowserChangeEvent = null):void {
 				var fragment:String = browserManager.fragment;
+				var object:URLVariables = new URLVariables();
+				
 				if (fragment) {
-					loadService.getPostById(fragment);
+					getDocument(fragment);
 				}
+			}
+			
+			/**
+			 * Get a snippet on the server
+			 * */
+			private function getDocument(fragment:String = ""):void {
+				var form:URLVariables;
+				var object:URLVariables;
+				
+				loadSuccessful = false;
+				loadInProgress = true;
+				
+				object = new URLVariables();
+				
+				//object.id = postID;
+				object.url = fragment;
+				
+				loadService.call = "Get post";
+				renderTimeLabel.text = "Loading";
+				//savingStatusGroup.visible = true;
+				// save project
+				loadService.send("snippets", "get_snippet", null, form);				
 			}
 			
 			private function registerNamespaces(xml:XML):void {
@@ -1355,7 +1403,7 @@
 			<s:SolidColor color="#e8e8e8"/>
 		</s:backgroundFill>
 		
-		<s:Label text="MXML Editor" fontSize="18" left="20" fontWeight="bold"/>
+		<s:Label text="MXML Azzurro" fontSize="18" left="20" fontWeight="bold"/>
 		
 	</s:BorderContainer>
 	
@@ -1425,7 +1473,7 @@
 			<s:HGroup id="savingStatusGroup" width="100%" verticalAlign="middle" bottom="0" fontSize="11"
 					  visible="false">
 				
-					<s:Label id="savingStatus" 
+					<s:Label id="savingStatus" backgroundColor="white" backgroundAlpha="1"
 							 x="15" y="15" 
 							 text="" 
 							 fontWeight="bold" 
@@ -1485,6 +1533,7 @@
 								mode="ace/mode/text" 
 								border="1px solid black"
 								showFoldWidgets="true" 
+								autoCompleterPopUpSize="400"
 								margin="{editorMargin}"
 								focusIn="editorFocusInHandler(event)"
 								change="editorChangeHandler(event)"

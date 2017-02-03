@@ -8,7 +8,7 @@
 			   
 			   minWidth="755" minHeight="200"
 			   preinitialize="application1_initializeHandler(event)"
-			   pageTitle="MXML Renderer"
+			   pageTitle="MXML Azzurro"
 			   >
 	
 	<fx:Script>
