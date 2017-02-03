@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   xmlns:handlers="com.flexcapacitor.handlers.*" 
+					   xmlns:window="com.flexcapacitor.effects.window.*" 
+					   xmlns:local="*"
+					   
+					   uncaughtError="uncaughtErrorHandler(event)"
+					   initialize="creationCompleteHandler(event)"
+					   minWidth="755" minHeight="200" 
+					   >
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.HTML;
+			import mx.events.FlexEvent;HTML;
+			
+			protected function uncaughtErrorHandler(event:UncaughtErrorEvent):void
+			{
+				//trace("ERROR");
+			}
+			
+			protected function creationCompleteHandler(event:FlexEvent):void
+			{
+				width = systemManager.stage.fullScreenWidth * .95;
+				height = systemManager.stage.fullScreenHeight * .90;
+				setActualSize(width, height);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Style source="assets/css/fonts.css"/>
+	<fx:Style source="assets/css/styles.css"/>
+	
+	<fx:Declarations>
+		<handlers:EventHandler target="{this}" eventName="creationComplete">
+			<window:CenterWindow target="{this}"/>
+		</handlers:EventHandler>
+	</fx:Declarations>
+	
+	<local:MXMLAzzurroMainView width="100%" height="100%"/>
+	
+</s:WindowedApplication>

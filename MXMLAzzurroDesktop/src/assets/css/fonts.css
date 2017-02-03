@@ -1,0 +1,10 @@
+/* CSS file */
+
+@font-face {
+   src: url("/assets/fonts/MaterialIcons-Regular.ttf");
+   fontFamily: MaterialIcon;
+   embedAsCFF: true;
+   fontWeight: normal;
+   fontStyle:  normal;
+/*   unicodeRange: U+0020-007E;*/
+}

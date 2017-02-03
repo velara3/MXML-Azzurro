@@ -1,0 +1,1599 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:components="flatspark.components.*"
+					   xmlns:utils="com.flexcapacitor.utils.*" 
+					   xmlns:controls="com.flexcapacitor.controls.*" 
+					   xmlns:model="com.flexcapacitor.model.*" 
+					   xmlns:handlers="com.flexcapacitor.handlers.*" 
+					   xmlns:window="com.flexcapacitor.effects.window.*" 
+					   xmlns:supportClasses="com.flexcapacitor.controls.supportClasses.*"
+					   xmlns:local="*"
+					   
+					   stateChangeComplete="stateChangeCompleteHandler(event)"
+					   enterFrame="windowedapplication1_enterFrameHandler(event)"
+					   creationComplete="view_creationCompleteHandler(event)" 
+					   >
+	
+	<fx:Script>
+		<![CDATA[
+			import com.flexcapacitor.controller.Radiate;
+			import com.flexcapacitor.controls.supportClasses.AceCommand;
+			import com.flexcapacitor.controls.supportClasses.AutoCompleteObject;
+			import com.flexcapacitor.controls.supportClasses.TokenInformation;
+			import com.flexcapacitor.events.AceEvent;
+			import com.flexcapacitor.events.IssueDataEvent;
+			import com.flexcapacitor.managers.CodeManager;
+			import com.flexcapacitor.managers.HistoryManager;
+			import com.flexcapacitor.model.Document;
+			import com.flexcapacitor.model.ErrorData;
+			import com.flexcapacitor.model.IDocument;
+			import com.flexcapacitor.model.IssueData;
+			import com.flexcapacitor.model.MetaData;
+			import com.flexcapacitor.model.SaveResultsEvent;
+			import com.flexcapacitor.model.SourceData;
+			import com.flexcapacitor.model.TranscoderDescription;
+			import com.flexcapacitor.services.IServiceEvent;
+			import com.flexcapacitor.services.IWPService;
+			import com.flexcapacitor.services.IWPServiceEvent;
+			import com.flexcapacitor.services.WPService;
+			import com.flexcapacitor.services.WPServiceBase;
+			import com.flexcapacitor.services.WPServiceEvent;
+			import com.flexcapacitor.utils.AceEditorUtils;
+			import com.flexcapacitor.utils.ClassLoader;
+			import com.flexcapacitor.utils.ClassRegistry;
+			import com.flexcapacitor.utils.ClassUtils;
+			import com.flexcapacitor.utils.DocumentTranscoder;
+			import com.flexcapacitor.utils.MXMLDocumentImporter;
+			import com.flexcapacitor.utils.StringUtils;
+			import com.flexcapacitor.utils.XMLUtils;
+			import com.flexcapacitor.utils.supportClasses.XMLValidationInfo;
+			
+			import flash.net.URLVariables;
+			import flash.net.navigateToURL;
+			import flash.utils.getTimer;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.HDividedBox;
+			import mx.core.UIComponent;
+			import mx.events.BrowserChangeEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.BrowserManager;
+			import mx.managers.IBrowserManager;
+			import mx.utils.Platform;
+			
+			import spark.components.Application;
+			import spark.components.WindowedApplication;
+			
+			import flashx.textLayout.tlf_internal;
+			import flashx.textLayout.conversion.ITextImporter;
+			import flashx.textLayout.conversion.TextConverter;
+			import flashx.textLayout.property.Property;
+			
+			import model.Snippet;
+			
+			use namespace tlf_internal;
+			
+			public static const SNIPPET:String = "snippet";
+			public static const NORMAL:String = "normal";
+			public static const SIDEBAR:String = "sidebar";
+			public static const EXAMPLES:String = "examples";
+			
+			public var coreClasses:Object;
+			public var mxClasses:MxClasses;
+			public var sparkClasses:SparkClasses;
+			public var experimentalClasses:ExperimentalClasses;
+			//public var sparkClasses:SparkClasses;
+			
+			public var iDocument:IDocument;
+			public var pendingCode:String;
+			public var updateOnSave:Boolean;
+			public var useStatusText:Boolean = false;
+			public var mxmlDocumentImporter:MXMLDocumentImporter;
+			
+			public var transcoder:TranscoderDescription;
+			public var importer:DocumentTranscoder;
+			public var sourceData:SourceData;
+			public var updateNeeded:Boolean;
+			public var updateNeededTime:int;
+			public var renderDeltaChanges:Boolean;
+			public var viewRendered:Boolean;
+			
+			public var debug:Boolean;
+			
+			[Bindable]
+			public var editorMargin:String = "10px 0 8px 0px";
+			
+			public var warningMessage:String = "Warning: XML is invalid and may not import correctly.";
+
+			public var classRegistry:ClassRegistry = ClassRegistry.getInstance();
+			
+			public var classLoader:ClassLoader;
+			
+			public var loadingEditor:Boolean;
+			
+			protected function view_creationCompleteHandler(event:FlexEvent):void {
+				//parentApplication.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, uncaughtErrorHandler);
+				Radiate.preventDefaultMessages = false;
+				ExternalInterface.marshallExceptions = true;
+				AceEditor.debug = true;
+				
+				ClassLoader.debug = debug;
+				classLoader = new ClassLoader();
+				classLoader.configPath = "assets/manifest/";
+				classLoader.configFileName = "flex-config-template.xml";
+				classLoader.addEventListener(ClassLoader.NAMESPACE_LOADED, namespaceLoaded, false, 0, true);
+				classLoader.addEventListener(ClassLoader.NAMESPACES_LOADED, namespacesLoaded, false, 0, true);
+				classLoader.addEventListener(IOErrorEvent.IO_ERROR, ioErrorEvent, false, 0, true);
+				classLoader.load();
+				
+				aceEditor.setCompleters(null);
+				aceEditor.addCompleter(codeCompleter, getDocTooltip);
+				
+				//aceEditor.addCommand(new AceCommand("find", {win: "Ctrl-B", "mac": "Cmd-B"}, findKeyboardHandler));
+				aceEditor.addCommand(new AceCommand("save", {win: "Ctrl-S", "mac": "Cmd-S"}, saveKeyboardHandler));
+				var renderCommand:AceCommand = new AceCommand("render");
+				renderCommand.bindKey =  {win: "Ctrl-Enter", "mac": "Cmd-Enter"};
+				renderCommand.exec =  renderKeyboardHandler;
+				aceEditor.addCommand(renderCommand);
+				
+				aceEditor.blur();
+				
+				if (Platform.isBrowser) {
+					editorMargin = "0";
+				}
+				
+				Property.errorHandler = propertyErrorHandler;
+				
+				var textFlowParser:ITextImporter;
+				
+				textFlowParser = TextConverter.getImporter(TextConverter.TEXT_LAYOUT_FORMAT, null);
+				textFlowParser.throwOnError = false;
+				
+				loadingEditor = true;
+				
+				setEditorText("Loading flex-config.xml");
+				
+				toggles.push(showExamplesButton);
+				toggles.push(showIssuesButton);
+				
+				setupSnippets();
+			}
+			
+			public function propertyErrorHandler(property:Property, value:Object):void {
+				//throw(new RangeError(createErrorString(p,value)));
+				var errorData:ErrorData;
+				var message:String = "Invalid property value for " + property.name;
+				
+				errorData = ErrorData.getIssue("Invalid value", message);
+				issuesInspector.updateIssuesTree([errorData]);
+			}
+			
+			/**
+			 * Handler for find keyboard shortcut
+			 * */
+			public function findKeyboardHandler(editor:Object, event:Object):void {
+				aceEditor.showSearchInput();
+			}
+			
+			/**
+			 * Handler for render view
+			 * */
+			public function renderKeyboardHandler(editor:Object=null, event:Object=null):void {
+				//trace("Keyboard render event");
+				invalidateDesignView();
+			}
+			
+			/**
+			 * Handler for find keyboard shortcut
+			 * */
+			public function saveKeyboardHandler(editor:Object=null, event:Object=null):void {
+				//trace("save keyboard event");
+				if (debug) trace("saved");
+			}
+			
+			protected function uncaughtErrorHandler(event:UncaughtErrorEvent):void {
+				// you're here probably because an incorrect style was set on Label 
+				// for example, you put "b" for fontWeight
+				
+				//ArgumentError: Error #2008: Parameter fontWeight must be one of the accepted values.
+				// at flash.text.engine::FontDescription/set fontWeight()
+				
+				// i think we need to use uncaughtErrorHandler and
+				// when we call validateClient we have to set displaylist to true
+				
+				/*
+				
+				textFlowParser = TextConverter.getImporter(TextConverter.TEXT_LAYOUT_FORMAT, null);
+				textFlowParser.throwOnError = false;
+				textFlow = textFlowParser.importToFlow(textFlowXML);
+				textFlowParser.errors;
+				
+				var errorData:ErrorData;
+				var message:String;
+				
+				if (event.error is Error) {
+				message = Error(event.error).message;
+				}
+				else if (event.error is ErrorEvent) {
+				message = ErrorEvent(event.error).text;
+				}
+				else {
+				message = event.error.toString();
+				}
+				
+				errorData = ErrorData.getIssue("Uncaught Error", message);
+				issuesInspector.updateIssuesTree([errorData]);
+				*/
+				
+				
+				if (debug) trace(event.error);
+			}
+			
+			protected function namespaceLoaded(event:Event):void {
+				var uri:String = classLoader.lastNamespaceURI;
+				appendEditorText("Loaded " + uri);
+				//appendEditorText(classLoader.componentsList.toXMLString());
+				//appendEditorText(classLoader.componentsArray);
+			}
+			
+			protected function namespacesLoaded(event:Event):void {
+				var xml:XML;
+				var namespaces:Object;
+				
+				appendEditorText("Namespaces loaded");
+				
+				xml = new XML(embeddedMXML.value);
+				namespaces = xml.namespaceDeclarations();
+				
+				for each (var ns:Namespace in namespaces) {
+					classRegistry.addNamespace(ns);
+					appendEditorText("Registering namespace " + ns.uri + " as " + ns.prefix);
+				}
+				
+				//registerNamespaces();
+				
+				loadingEditor = false;
+				//return;
+				
+				aceEditor.mode = "ace/mode/xml";
+				aceEditor.showGutter = true;
+				//setEditorText(embeddedMXML.value);
+				applicationCompleteHandler(null);
+			}
+			
+			public var message:String;
+			protected function applicationCompleteHandler(event:FlexEvent = null):void {
+				//textArea.text = message;
+				
+				XMLUtils.initialize();
+				
+				var hasDefinition:Boolean;
+				var appXML:XML;
+				var ns:Namespace;
+				var version:String;
+				
+				if (!Platform.isBrowser) {
+					appXML = NativeApplication.nativeApplication.applicationDescriptor;
+					ns = appXML.namespace();
+					version = appXML.versionNumber;
+				
+					version = appXML.ns::versionNumber;
+				}
+				else {
+					version = "1.0.0";
+				}
+				
+				CodeManager.setTranscodersVersion(version);
+				Radiate.initialize();
+				
+				//host = Radiate.getWPHostURL();
+				host = "https://www.radii8.com/snippets/";
+				
+				if (!Platform.isBrowser) {
+					Radiate.addComponentDefinition("WindowedApplication", "spark.components.WindowedApplication", WindowedApplication);
+				}
+				else {
+					Radiate.addComponentDefinition("Application", "spark.components.Application", Application);
+				}
+				
+				Radiate.addComponentDefinition("VDividedBox", "mx.components.VDividedBox", VDividedBox);
+				Radiate.addComponentDefinition("HDividedBox", "mx.components.HDividedBox", HDividedBox);
+				
+				// only update on save keyboard shortcut or on change
+				updateOnSave = false;
+				
+				updateOnChangeButton.selected = !updateOnSave;
+				
+				var transcoderDescription:TranscoderDescription = new TranscoderDescription();
+				var item:XML = <transcoder type="mxml" label="MXML" importLabel="MXML Importer" supportsImport="true" supportsExport="false" 
+								classPath="com.flexcapacitor.utils.MXMLDocumentImporter" 
+								extension="mxml" />;
+				
+				transcoderDescription.importXML(item);
+				
+				hasDefinition = ClassUtils.hasDefinition(transcoderDescription.classPath);
+				
+				if (hasDefinition) {
+					CodeManager.registerTranscoder(transcoderDescription);
+				}
+				
+				
+				if (iDocument==null) {
+					iDocument = new Document();
+				}
+				if (iDocument.instance==null && applicationLoader.targetApplication) {
+					iDocument.instance = applicationLoader.targetApplication;
+				}
+				
+				Radiate.instance.selectedDocument = iDocument;
+				
+				HistoryManager.doNotAddEventsToHistory = true;
+				
+				setDefaultXML();
+				
+				setupServices();
+				
+				setupBrowserManager();
+				
+				browserURLChange();
+				
+			}
+			
+			private var browserManager:IBrowserManager;
+			
+			private function setupBrowserManager():void {
+				browserManager = BrowserManager.getInstance();
+				browserManager.addEventListener(BrowserChangeEvent.APPLICATION_URL_CHANGE, applicationURLChange);
+				browserManager.addEventListener(BrowserChangeEvent.BROWSER_URL_CHANGE, browserURLChange);
+				browserManager.init("", "");
+			}
+			
+			/**
+			 * When you use the browserManager.setFragment() method to change the URL, you trigger an applicationURLChange event.
+			 **/
+			private function applicationURLChange(event:BrowserChangeEvent):void {
+				var fragment:String = browserManager.fragment;
+				if (fragment) {
+					//loadService.getPostById(fragment);
+				}
+			}
+			
+			private function setDefaultXML():void {
+				var transcoder:DocumentTranscoder = new DocumentTranscoder();
+				var defaultCode:XML = transcoder.getDefaultMXMLDocumentXML();
+				var comment:XML = <!--\n\n-->;
+				var code:String = defaultCode.appendChild(comment).toXMLString();
+				var xml:String = '<s:Label text="hello world" horizontalCenter="0" verticalCenter="0"></s:Label>';
+				var xmlString:String = StringUtils.indent(xml);
+				code = code.replace("</s:Application>", "\n" + xmlString + "\n</s:Application>");
+				setEditorText(code);
+				callLater(invalidateDesignView);
+			}
+			
+			public var mainDocumentSuggestions:Array = [];
+			public var suggestions:Array = [];
+			
+			public function codeCompleter(editor:Object, session:Object, position:Object, prefix:String, callback:Function):void {
+				var row:int = position.row;
+				var column:int = position.column;
+
+				callback(null, suggestions);
+			}
+			
+			public function getDocTooltip(item:AutoCompleteObject):void {
+				
+				
+				if (item.type==SNIPPET && item.docHTML==null) {
+					//trace("it's a snippet");
+					
+					item.docHTML = ["<b>", 
+						aceEditor.language.escapeHTML(item.caption), 
+						"</b>", 
+						"<hr></hr>",
+						aceEditor.language.escapeHTML(item.value)
+					].join("");
+					//ace.language.escapeHTML(item.snippet)
+				}
+				else if (item.docHTML==null) {
+					item.docHTML = ["<b>", 
+						aceEditor.language.escapeHTML(item.value), 
+						"</b>", 
+						"<hr></hr>",
+						aceEditor.language.escapeHTML(item.caption)
+					].join("");
+					//trace("not a snippet");
+				}
+			}
+			
+			protected function ioErrorEvent(event:Event):void
+			{
+				if (debug) trace(event);
+			}
+			
+			public var cachedClassValues:Dictionary = new Dictionary(true);
+			public var jumpingToMatching:Boolean;
+			public var tokenInfo:TokenInformation;
+			
+			protected function cursorChangeHandler(event:AceEvent):void {
+				var cursorString:String;
+				var cursor:Object;
+				var token:Object;
+				var type:String;
+				var entity:String = "";
+				var output:String;
+				var isMultiline:Boolean;
+				var isMouseDown:Boolean;
+				var tokenText:String = "";
+				var showToken:Boolean = true;
+				
+				//PerformanceMeter.mark("Start", true);
+				isMultiline = aceEditor.isSelectionMultiline();
+				isMouseDown = aceEditor.isMouseDown();
+				
+				if (loadingEditor) { return; }
+				if (isMultiline && isMouseDown) { return; }
+				
+				cursor = aceEditor.getCursor();
+				token = aceEditor.getTokenAt(cursor.row, cursor.column);
+				type = token ? token.type : null;
+				//PerformanceMeter.mark("After getTokenAt");
+				
+				tokenInfo = AceEditorUtils.getTokenInformation(aceEditor);
+				suggestions = AceEditorUtils.getSuggestionList(tokenInfo, aceEditor);
+				//PerformanceMeter.mark("After getAutoCompleteList");
+				
+				if (type!=null) {
+					cursorString = aceEditor.getCursorString(cursor);
+					
+					if (showToken) {
+						tokenText = " Token: " + type;
+					}
+					
+					if (tokenInfo.classFound==false) {
+						output = cursorString + "   Entity: " + tokenInfo.entity + "   Class found: false" + tokenText;
+					}
+					else {
+						output = cursorString + "   Entity: " + tokenInfo.entity + tokenText;
+					}
+					
+					if ("statusText" in parentApplication) {
+						parentApplication["statusText"].text = output;
+					}
+					else {
+						cursorLocationLabel.text = output;
+					}
+				}
+				else {
+					cursorString = aceEditor.getCursorString(cursor);
+					cursorLocationLabel.text = cursorString;
+				}
+				
+				var updatedQName:QName;
+				var classObject:Object;
+				var tagQName:QName;
+				var attributeQName:QName;
+				var qualifiedClassName:String;
+				
+				//PerformanceMeter.mark("After end of cursorChange");
+				
+			}
+			
+			
+			protected function issuesInspector_changeHandler(event:IssueDataEvent):void
+			{
+				var errorData:ErrorData = event.issueData as ErrorData;
+				
+				if (errorData) {
+					showMessage(event.label, event.description, errorData.line, errorData.column, false);
+				}
+				else {
+					showMessage(event.label, event.description, -1, -1, false);
+				}
+			}
+			
+			protected function examplesList_changeHandler(event:Event):void {
+				var selectedSnippet:Snippet = examplesList.selectedItem as Snippet;
+				
+				if (!(event is MouseEvent)) return;
+				if (selectedSnippet==null) return;
+				applicationLoader.createCleanApplication()
+				//setEditorText(selectedSnippet.source);
+				aceEditor.validateNow();
+				aceEditor.resetUndoHistory();
+				//examplesList.selectedItem = null;
+				examplesList.validateNow();
+				//callLater(invalidateDesignView);
+				pendingCode = selectedSnippet.source;
+			}
+			
+			public function showMessage(firstMessage:String, secondMessage:String = "", row:int = -1, column:int = 0, updateIssues:Boolean = true):void {
+				var errorData:ErrorData;
+				
+				if (useStatusText) {
+					//statusText.text = firstMessage + ": " + secondMessage;
+					cursorLocationLabel.text = firstMessage + ": " + secondMessage;
+				}
+				else {
+					errorGroup.visible = true;
+					errorGroup.includeInLayout = true;
+					lineError.text = firstMessage;
+					warningLabel.text = secondMessage;
+					warningLabel.toolTip = secondMessage;
+				}
+				
+				aceEditor.clearAnnotations();
+				aceEditor.setAnnotation(row, column, secondMessage, "error");
+				
+				if (updateIssues) {
+					errorData = ErrorData.getIssue(firstMessage, secondMessage, row, column);
+					issuesInspector.updateIssuesTree([errorData], []);
+				}
+			}
+			
+			// the application wasn't loading. restarted flash builder and 
+			// application.swf started loading again
+			protected function applicationLoader_completeHandler(event:Event):void {
+				//trace("application loaded");
+				if (iDocument==null) {
+					iDocument = new Document();
+					//iDocument.instance = applicationLoader.targetApplication;
+				}
+				
+				iDocument.instance = applicationLoader.targetApplication;
+				Radiate.instance.selectedDocument = iDocument;
+				//Radiate.setTarget(iDocument.instance);
+				if (pendingCode) {
+					aceEditor.text = pendingCode;
+					pendingCode = null;
+				}
+				invalidateDesignView();
+				applicationLoader.targetApplication.focusManager.activate();
+			}
+			
+			protected function clearDocumentButton_clickHandler(event:MouseEvent):void
+			{
+				applicationLoader.createCleanApplication();
+				//application.removeAllElements();
+				setDefaultXML();
+				aceEditor.validateNow();
+				aceEditor.resetUndoHistory();
+				invalidateDesignView();
+			}
+			
+			protected function addComplexMXML_clickHandler(event:MouseEvent):void
+			{
+				//applicationLoader.createCleanApplication();
+				applicationLoader.resetApplication();
+				setEditorText(embeddedComplexMXML.value);
+				aceEditor.validateNow();
+				aceEditor.resetUndoHistory();
+				invalidateDesignView();
+			}
+			
+			protected function addRichTextMXML_clickHandler(event:MouseEvent):void
+			{
+				//applicationLoader.createCleanApplication();
+				applicationLoader.resetApplication();
+				setEditorText(embeddedRichTextMXML.value);
+				aceEditor.validateNow();
+				aceEditor.resetUndoHistory();
+				invalidateDesignView();
+			}
+			
+			protected function addSimpleMXML_clickHandler(event:MouseEvent):void
+			{
+				//applicationLoader.createCleanApplication();
+				applicationLoader.resetApplication();
+				setEditorText(embeddedSimpleMXML.value);
+				aceEditor.validateNow();
+				aceEditor.resetUndoHistory();
+				invalidateDesignView();
+			}
+			
+			protected function updateDocumentButton_clickHandler(event:MouseEvent):void
+			{
+				invalidateDesignView();
+			}
+			
+			protected function saveDocumentButton_clickHandler(event:MouseEvent):void
+			{
+				postDocument();
+			}
+			
+			public var deferredState:String;
+			
+			protected function showIssuesButton_clickHandler(event:MouseEvent):void {
+				
+				if (currentState!=SIDEBAR) {
+					if (currentState != NORMAL) {
+						deferredState = SIDEBAR;
+						setCurrentState(NORMAL);
+						deselectToggles(event.currentTarget);
+						return;
+					}
+				}
+				callLater(showIssues);
+			}
+			
+			public function showIssues():void {
+				if (currentState!=SIDEBAR) {
+					setCurrentState(SIDEBAR);
+				}
+				else {
+					setCurrentState(NORMAL);
+				}
+			}
+			
+			protected function showExamplesButton_clickHandler(event:MouseEvent):void {
+				
+				if (currentState!=EXAMPLES) {
+					if (currentState != NORMAL) {
+						deferredState = EXAMPLES;
+						setCurrentState(NORMAL);
+						deselectToggles(event.currentTarget);
+						return;
+					}
+				}
+				
+				callLater(showExamples);
+			}
+			
+			public function showExamples():void {
+				
+				if (currentState!=EXAMPLES) {
+					setCurrentState(EXAMPLES);
+				}
+				else {
+					setCurrentState(NORMAL);
+				}
+			}
+			
+			/**
+			 * Array of toggle buttons that are selected in an open state in the skin
+			 * */
+			public var toggles:Array = [];
+			
+			/**
+			 * Deselects toggle buttons when going from one open skin state to another
+			 * */
+			public function deselectToggles(selectedToggle:Object=null):void {
+				var toggle:ToggleButton;
+				
+				for (var i:int = 0; i < toggles.length; i++)  {
+					toggle = toggles[i] as ToggleButton;
+					
+					if (toggle!=selectedToggle) {
+						toggle.selected = false;
+					}
+				}
+				
+			}
+			
+			protected function updateOnChangeButton_clickHandler(event:MouseEvent):void
+			{
+				if (updateOnChangeButton.selected) {
+					updateOnSave = false;
+				}
+				else {
+					updateOnSave = true;
+				}
+			}
+			
+			/**
+			 * This method lets us show a status indication while rendering
+			 * */
+			public function invalidateDesignView():void {
+				renderTimeLabel.text = "Rendering...";
+				renderTimeLabel.validateNow();
+				
+				// we check on the next frame if any updates are needed 
+				updateNeeded = true;
+				updateNeededTime = getTimer();
+				//callLater(updateView);
+			}
+			
+			protected function windowedapplication1_enterFrameHandler(event:Event):void
+			{
+				var diff:int = getTimer()-updateNeededTime;
+				
+				if (updateNeeded && diff>50) {
+					//trace("updating the view");
+					updateView();
+					updateNeeded = false;
+				}
+				
+				return;
+				if (updateNeeded) {
+					//callLater(updateView);
+					updateView();
+					updateNeeded = false;
+					//renderTimeLabel.text = "";
+				}
+			}
+			
+			/**
+			 * Updates the view. We could move this to another thread
+			 * */
+			public function updateView():void {
+				if (iDocument==null || iDocument.instance==null) return; // not loaded yet
+				var error:IssueData;
+				var code:String;
+				var time:int;
+				
+				code = aceEditor.text;
+				//trace("Inside updating the view");
+				if (transcoder==null) {
+					transcoder = CodeManager.getImporter(CodeManager.MXML);
+					importer = transcoder.importer;
+					importer.removeAllOnImport = true;
+					importer.makeInteractive = true;
+				}
+				
+				time = getTimer();
+				
+				if (!renderDeltaChanges) {
+					sourceData = importer.importare(code, iDocument);
+				}
+				else {
+					/*
+					parseFile();
+					computeChanges();
+					applyChanges();
+					*/
+				}
+				
+				time = getTimer()-time;
+				renderTimeLabel.text = time + "ms";
+				
+				if (issuesInspector) {
+					issuesInspector.updateIssuesTree(sourceData.errors, sourceData.warnings);
+					if (sourceData.errors && sourceData.errors.length) {
+						error = sourceData.errors[0] as IssueData;
+						showMessage(error.label, error.description, error.line, error.column, false);
+					}
+				}
+				//aceEditor.moveCursorTo(0,0);
+				updateNeeded = false;
+			}
+			
+			private var lastFocusedEditor:Object;
+			
+			private function editorFocusInHandler(event:FocusEvent):void {
+				lastFocusedEditor = event.currentTarget;
+			}
+			
+			protected function saveHandler(event:Event = null):void {
+				invalidateDesignView();
+			}
+			
+			protected function editorChangeHandler(event:AceEvent = null):void {
+				var validationInfo:XMLValidationInfo;
+				var errorLocation:String;
+				var isValid:Boolean;
+				var message:String;
+				var error:Object;
+				var code:String;
+				var time:int;
+				
+				if (loadingEditor) return;
+				
+				code = aceEditor.text;
+				//PerformanceMeter.mark("Before xml validation", true);
+				isValid = XMLUtils.isValidXML(code);
+				//PerformanceMeter.mark("After xml validation");
+				//error = XMLUtils.validationError;
+				
+				if (!isValid && code!="") {
+					time = getTimer();
+					validationInfo = XMLUtils.validateXML(code, true, true);
+					time = getTimer()-time;
+					message = XMLUtils.validationError ? "" +  validationInfo.internalErrorMessage : warningMessage;
+					errorLocation = "At line " + (validationInfo.row) + " column " + validationInfo.column+ ":";
+					showMessage(errorLocation, message, validationInfo.row-1, validationInfo.column);
+					renderTimeLabel.text = "Validation time "+ time + "ms";
+				}
+				else {
+					hideMessage();
+					
+					if (!updateOnSave) {
+						invalidateDesignView();
+						
+						if (renderDeltaChanges) {
+							//checkForDifferences();
+						}
+					}
+				}
+				
+				//var token:Object = aceEditor.getSelectionAnchor();
+				
+			}
+			
+			public function hideMessage():void {
+				
+				if (useStatusText) {
+					//statusText.text = "";
+					cursorLocationLabel.text = "";
+				}
+				else {
+					errorGroup.visible = false;
+					errorGroup.includeInLayout = false;
+					lineError.text = "";
+					warningLabel.text = "";
+					warningLabel.toolTip = "";
+				}
+				
+				aceEditor.clearAnnotations();
+			}
+			
+			public function hideEditor():void {
+				
+				if (aceEditor) {
+					aceEditor.visible = false;
+				}
+			}
+			
+			public function showEditor():void {
+				
+				if (aceEditor) {
+					aceEditor.visible = true;
+				}
+			}
+			
+			public function setEditorText(text:String, update:Boolean = true):void {
+				applicationLoader.resetApplication();
+				aceEditor.text = text;
+				aceEditor.validateNow();
+				aceEditor.resetUndoHistory();
+				if (update) invalidateDesignView();
+			}
+			
+			protected function applicationLoader_ioErrorHandler(event:IOErrorEvent):void
+			{
+				
+			}
+			
+			
+			/**
+			 * Appends text to the editor
+			 * */
+			public function appendEditorText(value:String):void {
+				aceEditor.appendText(value);
+			}
+			
+			public function setBackgroundImage(bitmapData:BitmapData):void {
+				//if (applicationLoader.targetApplication) {
+				//	applicationLoader.targetApplication.setStyle("backgroundImage", bitmapData);
+				//}
+				if (canvasBorderInstance) {
+					canvasBorderInstance.setStyle("backgroundImage", bitmapData);
+					canvasBorderInstance.setStyle("backgroundImageFillMode", "clip");
+					//applicationLoader.targetApplication.setStyle("backgroundImage", bitmapData);
+				}
+			}
+			
+			protected function hdividedbox1_dividerReleaseHandler(event:Event):void
+			{
+				if (aceEditorDividedBox.numChildren==2) {
+					var firstChild:UIComponent = aceEditorDividedBox.getChildAt(0) as UIComponent;
+					if (firstChild.width<5) {
+						//firstChild.alpha = 1;
+						//firstChild.width = -6;
+						currentState = NORMAL;
+						firstChild.width = 200;
+						showIssuesButton.selected = false;
+					}
+					else if (firstChild.alpha==0) {
+						//firstChild.alpha = 1;
+						//currentState = SIDEBAR;
+					}
+				}
+			}
+			
+			protected function vdividedbox1_dividerReleaseHandler(event:Event):void
+			{
+				var firstChild:UIComponent = aceEditorDividedBox as UIComponent;
+				if (firstChild.height<8) {
+					//trace("divider group setting visible to true");
+					//currentState = NORMAL;
+					//firstChild.height = 0;
+					firstChild.visible = false;
+					aceEditor.visible = false;
+					//showIssuesButton.selected = false;
+				}
+				else if (aceEditor.visible==false) {
+					//trace("divider release setting visible to true");
+					//firstChild.height = 0;
+					firstChild.visible = true;
+					aceEditor.visible = true;
+					//firstChild.alpha = 1;
+					//currentState = SIDEBAR;
+				}
+			}
+			
+			private var loginThroughBrowserService:WPService;
+			
+			private function loginAnonymousUser():void {
+				/*
+				// we need to create service
+				if (loginThroughBrowserService==null) {
+					loginThroughBrowserService = new WPService();
+				}
+								
+				loginThroughBrowserService.useNavigateToURL = true;
+				loginThroughBrowserService.windowName = window;
+				
+				loginThroughBrowserService.host = Radiate.getWPURL();
+				
+				loginThroughBrowserService.loginUser(username, password);
+				*/
+			}
+			
+			private var host:String;
+			
+			private var loadService:WPService;
+			private var saveService:WPService;
+			private var saveSuccessful:Boolean;
+			private var saveInProgress:Boolean;
+			
+			private function postDocument():void {
+				var form:URLVariables;
+				
+				saveSuccessful = false;
+				saveInProgress = true;
+				
+				form = toSaveFormObject();
+				saveService.call = "Post call";
+				savingStatus.text = "Saving";
+				savingStatusGroup.visible = true;
+				// save project
+				saveService.send("snippets", "create_snippet", null, form);				
+			}
+			
+			/**
+			 * Creates an object to send to the server
+			 * */
+			public function toSaveFormObject():URLVariables {
+				var object:URLVariables = new URLVariables();
+				var value:String = aceEditor.text;
+				
+				object.title = "A Snippet";
+				object.content = "An MXML snippet";
+				//object.content = value;
+				//object.categories = "document";
+				
+				//if (id) 		object.id 		= id;
+				//if (status)		object.status 	= status;
+				//object.type 	= "page";
+				
+				//object["custom[uid]"] = uid;
+				//object["custom[sponge]"] = 1;
+				//object["custom[sandpaper]"] = 1;
+				
+				object["custom[source]"] = value;
+				
+				return object;
+			}
+			
+			/**
+			 * Result from save result
+			 * */
+			public function saveResultsHandler(event:IWPServiceEvent):void {
+				var saveResultsEvent:SaveResultsEvent = new SaveResultsEvent(SaveResultsEvent.SAVE_RESULTS);
+				var data:Object = event.data;
+				var post:Object = data ? data.post : null;
+				
+				saveResultsEvent.call = event.call;
+				saveResultsEvent.data = event.data;
+				saveResultsEvent.message = event.message;
+				saveResultsEvent.text = event.text;
+				
+				if (post) {
+					var uri:String = post.url;
+					var status:String = post.status;
+					savingStatus.text = "Snippet saved";
+					browserManager.setFragment(post.id);
+					
+					saveSuccessful = true;
+				}
+				else {
+					savingStatus.text = "Not saved";
+					saveSuccessful = false;
+				}
+				
+				setTimeout(removeSaveLabel, 5000);
+				
+				saveInProgress = false;
+			}
+			
+			public function removeSaveLabel():void {
+				savingStatusGroup.visible = false;
+			}
+			
+			/**
+			 * Result from save fault
+			 * */
+			public function saveFaultHandler(event:IServiceEvent):void {
+				var service:IWPService = saveService;
+				var errorEvent:Object = service && "errorEvent" in service ? WPService(service).errorEvent : null;
+				var errorID:int;
+				var errorText:String;
+				var errorType:String;
+				var results:String;
+				
+				if (errorEvent) {
+					errorText = "text" in errorEvent ? errorEvent.text : "";
+					errorText = "message" in errorEvent ? errorEvent.message : errorText;
+					errorID = "errorID" in errorEvent ? errorEvent.errorID : 0;
+					errorType = "type" in errorEvent ? errorEvent.type : "";
+					results = "Error when saving snippet. You may be disconnected. Check your connection and try again";
+				}
+				else {
+					results = "Error when trying to save document";
+				}
+				
+				savingStatus.text = results;
+			
+				setTimeout(removeSaveLabel, 5000);
+			
+				saveInProgress = false;
+			}
+			
+			/**
+			 * Result from load result
+			 * */
+			public function loadResultsHandler(event:IWPServiceEvent):void {
+				var data:Object = event.data;
+				var post:Object = data ? data.post : null;
+				
+				if (post) {
+					var uri:String = post.url;
+					var status:String = post.status;
+					var customFields:Object = post.custom_fields;
+					var source:String = browserManager ? customFields.source : null;
+					setEditorText(source);
+					renderTimeLabel.text = "Loaded";
+				}
+				else {
+					renderTimeLabel.text = "Not loaded";
+				}
+				
+			}
+			
+			/**
+			 * Result from load fault
+			 * */
+			public function loadFaultHandler(event:IServiceEvent):void {
+				var errorEvent:Object = loadService && "errorEvent" in loadService ? WPService(loadService).errorEvent : null;
+				var errorID:int;
+				var errorText:String;
+				var errorType:String;
+				var results:String;
+				
+				if (errorEvent) {
+					errorText = "text" in errorEvent ? errorEvent.text : "";
+					errorText = "message" in errorEvent ? errorEvent.message : errorText;
+					errorID = "errorID" in errorEvent ? errorEvent.errorID : 0;
+					errorType = "type" in errorEvent ? errorEvent.type : "";
+					results = "Error when saving document: "+ name + ". You may be disconnected. Check your connection and try again";
+				}
+				else {
+					results = "Error when trying to save document: "+ name;
+				}
+				
+			}
+			
+			protected function searchButton_clickHandler(event:MouseEvent):void {
+				var selection:String;
+				
+				if (aceEditor.isSearchBoxVisible()) {
+					
+					if (aceEditor.isReplaceBoxVisible()) {
+						aceEditor.hideSearchInput();
+					}
+					else {
+						selection = aceEditor.getSelectedText();
+						aceEditor.showSearchInput(selection, true, true);
+					}
+				}
+				else {
+					selection = aceEditor.getSelectedText();
+					aceEditor.showSearchInput(selection);
+				}
+			}
+			
+			private function setupServices():void {
+				
+				if (saveService==null) {
+					saveService = new WPService();
+					saveService.host = host;
+					saveService.addEventListener(WPServiceBase.RESULT, saveResultsHandler, false, 0, true);
+					saveService.addEventListener(WPServiceBase.FAULT, saveFaultHandler, false, 0, true);
+				}	
+				
+				if (loadService==null) {
+					loadService = new WPService();
+					loadService.host = host;
+					loadService.addEventListener(WPServiceEvent.RESULT, loadResultsHandler);
+					loadService.addEventListener(WPServiceEvent.FAULT, loadFaultHandler);
+				}	
+			}
+			
+			private function browserURLChange(event:BrowserChangeEvent = null):void {
+				var fragment:String = browserManager.fragment;
+				if (fragment) {
+					loadService.getPostById(fragment);
+				}
+			}
+			
+			private function registerNamespaces(xml:XML):void {
+				var namespaces:Object;
+				
+				if (xml==null) {
+					return;
+				}
+				
+				//appendEditorText("Namespaces loaded");
+				classRegistry.clearNamespaces();
+				
+				namespaces = xml.namespaceDeclarations();
+				
+				for each (var ns:Namespace in namespaces) {
+					classRegistry.addNamespace(ns);
+					//appendEditorText("Registering namespace " + ns.uri + " as " + ns.prefix);
+				}
+			}
+			
+			private function showASDocs():void {
+				var attributeMetaData:MetaData = tokenInfo.attributeMetaData;
+				var objectMetaData:Object;
+				var request:URLRequest;
+				var url:String;
+				
+				objectMetaData = attributeMetaData ? attributeMetaData : tokenInfo.qualifiedClassName;
+				
+				if (objectMetaData) {
+					url = Radiate.getURLToHelp(objectMetaData);
+					
+					request = new URLRequest(url);
+					
+					navigateToURL(request, "asdocs");
+				}
+				else {
+					trace("No data available");
+				}
+			}
+			
+			[Bindable]
+			public var examplesCollection:ArrayCollection;
+			
+			
+			protected function stateChangeCompleteHandler(event:Event):void {
+				if (deferredState!=null) {
+					currentState = deferredState;
+					deferredState = null;
+				}
+			}
+			
+			private function setupSnippets():void {
+				examplesCollection = new ArrayCollection();
+				
+				var snippet:Snippet = new Snippet();
+				snippet.name = "Simple";
+				snippet.source = embeddedSimpleMXML.value;
+				
+				examplesCollection.addItem(snippet);
+				
+				snippet = new Snippet();
+				snippet.name = "Rich Text";
+				snippet.source = embeddedRichTextMXML.value;
+				
+				examplesCollection.addItem(snippet);
+				
+				snippet = new Snippet();
+				snippet.name = "Complex";
+				snippet.source = embeddedComplexMXML.value;
+				
+				examplesCollection.addItem(snippet);
+				
+				examplesList.dataProvider = examplesCollection;
+			}
+			
+			protected function applicationLoader_resetHandler(event:Event):void {
+				if (pendingCode) {
+					aceEditor.text = pendingCode;
+					pendingCode = null;
+					invalidateDesignView();
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	
+	
+	<fx:Declarations>
+		
+		<fx:XML id="schemaTest">
+			<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" 
+					   targetNamespace="http://www.w3schools.com"
+					   xmlns="http://www.w3schools.com"
+					   elementFormDefault="qualified">
+				
+				<xs:element name="shiporder">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="orderperson" type="xs:string"/>
+							<xs:element name="shipto">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="name" type="xs:string"/>
+										<xs:element name="address" type="xs:string"/>
+										<xs:element name="city" type="xs:string"/>
+										<xs:element name="country" type="xs:string"/>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+							<xs:element name="item" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="title" type="xs:string"/>
+										<xs:element name="note" type="xs:string" minOccurs="0"/>
+										<xs:element name="quantity" type="xs:positiveInteger"/>
+										<xs:element name="price" type="xs:decimal"/>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+						<xs:attribute name="orderid" type="xs:string" use="required"/>
+					</xs:complexType>
+				</xs:element>
+				
+			</xs:schema> 
+		</fx:XML>
+		
+		
+		
+		<fx:String id="Errors">
+			<![CDATA[
+			ArgumentError: Error #2008: Parameter fontWeight must be one of the accepted values.
+			at flash.text.engine::FontDescription/set fontWeight()
+			at spark.components::Label/createElementFormat()[/Users/justinmclean/Documents/ApacheFlex4.15/frameworks/projects/spark/src/spark/components/Label.as:590]
+			at spark.components::Label/http://www.adobe.com/2006/flex/mx/internal::composeTextLines()[/Users/justinmclean/Documents/ApacheFlex4.15/frameworks/projects/spark/src/spark/components/Label.as:463]
+			at spark.components.supportClasses::TextBase/updateDisplayList()[/Users/justinmclean/Documents/ApacheFlex4.15/frameworks/projects/spark/src/spark/components/supportClasses/TextBase.as:705]
+			at mx.core::UIComponent/validateDisplayList()[/Users/justinmclean/Documents/ApacheFlex4.15/frameworks/projects/framework/src/mx/core/UIComponent.as:9531]
+			at mx.managers::LayoutManager/validateDisplayList()[/Users/justinmclean/Documents/ApacheFlex4.15/frameworks/projects/framework/src/mx/managers/LayoutManager.as:744]
+			at mx.managers::LayoutManager/doPhasedInstantiation()[/Users/justinmclean/Documents/ApacheFlex4.15/frameworks/projects/framework/src/mx/managers/LayoutManager.as:827]
+			at mx.managers::LayoutManager/doPhasedInstantiationCallback()[/Users/justinmclean/Documents/ApacheFlex4.15/frameworks/projects/framework/src/mx/managers/LayoutManager.as:1188]
+
+			Solution: 
+			Add error handler to TLF text input
+			- also do a clean and then try again. 
+			]]>
+		</fx:String>
+	</fx:Declarations>
+	
+	
+	
+	<fx:Declarations>
+		
+		<model:EmbeddedFile id="embeddedMXML" file='@Embed("./examples/mxml.txt",mimeType="application/octet-stream")'/>
+		<model:EmbeddedFile id="embeddedComplexMXML" file='@Embed("./examples/mxmlComplex.txt",mimeType="application/octet-stream")'/>
+		<model:EmbeddedFile id="embeddedSimpleMXML" file='@Embed("./examples/mxmlSimple.txt",mimeType="application/octet-stream")'/>
+		<model:EmbeddedFile id="embeddedRichTextMXML" file='@Embed("./examples/mxmlRichText.txt",mimeType="application/octet-stream")'/>
+		<model:EmbeddedFile id="embeddedMXMLBrowser" file='@Embed("./examples/mxmlbrowser.txt",mimeType="application/octet-stream")'/>
+		
+		<utils:MiniInspector/>
+	</fx:Declarations>
+	
+	
+	<s:transitions>
+		<!--
+		<s:Transition fromState="normal" toState="sidebar" interruptionBehavior="stop" autoReverse="true">
+			<s:Sequence duration="500" 
+						effectStart="trace('normal to sidebar view')"
+						>
+				<s:Resize target="{issuesInspectorGroup.parent}"/>
+				<s:AddAction target="{issuesInspectorGroup}"/>
+				<s:Fade target="{issuesInspectorGroup}"/>
+			</s:Sequence>
+		</s:Transition>
+		
+		<s:Transition fromState="normal" toState="examples" interruptionBehavior="stop" autoReverse="true">
+			<s:Sequence duration="250" 
+						effectStart="trace('normal to example view')"
+						>
+				<s:Resize target="{examplesGroup.parent}"/>
+				<s:AddAction target="{examplesGroup}"/>
+				<s:Fade target="{examplesGroup}"/>
+			</s:Sequence>
+		</s:Transition>-->
+	</s:transitions>
+	
+	<s:states>
+		<s:State name="normal"/>
+		<s:State name="sidebar"/>
+		<s:State name="examples"/>
+	</s:states>
+	
+	
+	<!--
+	<s:HGroup padding="10">
+		<s:Label text="Class registry" paddingTop="5" paddingLeft="5" fontSize="32"/>
+	</s:HGroup>
+	
+	<mx:HDividedBox width="80%" height="100%" left="20" top="100" bottom="28">
+		<s:VGroup width="50%" height="100%" >
+			<s:Label id="searchLabel" text="Search"/>
+			<components:TextInputIcon id="searchInput" 
+									  prompt="Enter a class name" 
+									  change="searchField_changeHandler(event)"/>
+			<controls:AceEditor id="aceEditor"
+								mode="ace/mode/xml"
+								scrollSpeed=".5"
+								width="100%" height="100%"
+								changeCursor="aceEditor_changeCursorHandler(event)"
+								/>
+		</s:VGroup>
+		
+	</mx:HDividedBox>
+	-->
+	
+	
+	<s:BorderContainer width="100%" 
+					   left="0" 
+					   right="0"
+					   top="0" 
+					   height="60"
+					   borderVisible="false">
+		
+		<s:layout>
+			<s:HorizontalLayout verticalAlign="middle" paddingLeft="10"/>
+		</s:layout>
+		
+		<s:backgroundFill>
+			<s:SolidColor color="#e8e8e8"/>
+		</s:backgroundFill>
+		
+		<s:Label text="MXML Editor" fontSize="18" left="20" fontWeight="bold"/>
+		
+	</s:BorderContainer>
+	
+	
+	<mx:VDividedBox id="mainVerticalGroup" width="100%" height="100%" 
+					top="68" 
+					right="10" 
+					left="10" 
+					bottom="55" 
+					verticalGap="6" 
+					liveDragging="true"
+					updateComplete="vdividedbox1_dividerReleaseHandler(event)">
+		<s:BorderContainer id="applicationGroup" width="100%" height="100%" 
+						   borderVisible="false">
+			<s:backgroundFill> 
+				<s:SolidColor color="0xFFFFFF" alpha="1"/> 
+			</s:backgroundFill> 
+			
+			<s:BorderContainer id="canvasBorderInstance" 
+							   top="0"
+							   left="0" right="0"
+							   backgroundAlpha="1"
+							   borderVisible="true"
+							   borderColor="gray"
+							   visible="true"
+							   height="100%">
+				
+				<controls:ApplicationLoader id="applicationLoader" width="100%" height="100%"
+											ioError="applicationLoader_ioErrorHandler(event)"
+											reset="applicationLoader_resetHandler(event)"
+											applicationComplete="applicationLoader_completeHandler(event)"/>
+				
+				<!--- 
+				This group is used to add visual elements above the application.
+				For example, selection and resizing borders. 
+				-->
+				<!--<s:Group id="toolLayerInstance" 
+						 mouseChildren="false" 
+						 mouseEnabled="false">
+					
+				</s:Group>-->
+				
+			</s:BorderContainer>
+			
+			<s:HGroup width="100%" verticalAlign="middle" bottom="0" fontSize="11"
+					  visible="false">
+				
+				<s:HGroup id="errorGroup" width="100%" 
+						  verticalAlign="middle" 
+						  includeInLayout="false" visible="false">
+					<s:Label id="lineError" 
+							 x="15" y="15" 
+							 text="" 
+							 fontWeight="bold" 
+							 color="red"/>
+					
+					<s:Label id="warningLabel" 
+							 x="15" y="15" 
+							 text="" maxDisplayedLines="1"
+							 fontWeight="bold" 
+							 color="red"
+							 width="100%"/>
+				</s:HGroup>
+				<s:Spacer width="15%"/>
+				
+			</s:HGroup>
+			<s:HGroup id="savingStatusGroup" width="100%" verticalAlign="middle" bottom="0" fontSize="11"
+					  visible="false">
+				
+					<s:Label id="savingStatus" 
+							 x="15" y="15" 
+							 text="" 
+							 fontWeight="bold" 
+							 color="blue"/>
+				
+			</s:HGroup>
+		</s:BorderContainer>
+		
+		<mx:HDividedBox id="aceEditorDividedBox" left="15" 
+						height="50%"
+						width="100%" 
+						horizontalScrollPolicy="off"
+						updateComplete="hdividedbox1_dividerReleaseHandler(event)">
+			
+		<!--<s:HGroup id="aceEditorDividedBox" left="15" 
+				  height="50%"
+				  width="100%" >-->
+			<s:Group id="issuesInspectorGroup" height="100%" includeIn="sidebar" itemCreationPolicy="immediate" width="200">
+				<supportClasses:IssuesInspector id="issuesInspector" 
+												width="100%" height="100%"
+												change="issuesInspector_changeHandler(event)"
+												top="0"
+												bottom="0">
+					
+				</supportClasses:IssuesInspector>
+				<s:Label y="25" 
+						 text="No issues" 
+						 color="#787878" 
+						 fontWeight="normal"
+						 horizontalCenter="0"
+						 visible="{issuesInspector.listCollection.length==0}"/>
+			</s:Group>
+			
+			<s:Group id="examplesGroup" height="100%" includeIn="examples" itemCreationPolicy="immediate" width="200">
+				<s:List id="examplesList" 
+						width="100%" height="100%"
+						change="examplesList_changeHandler(event)"
+						click="examplesList_changeHandler(event)"
+						labelField="name"
+						top="0"
+						bottom="0">
+					
+				</s:List>
+				<s:Label y="25" 
+						 text="No examples" 
+						 color="#787878" 
+						 fontWeight="normal"
+						 horizontalCenter="0"
+						 visible="{examplesCollection.length==0}"/>
+			</s:Group>
+			
+			
+				
+			<controls:AceEditor id="aceEditor" 
+								width="100%" 
+								height="100%"
+								mode="ace/mode/text" 
+								border="1px solid black"
+								showFoldWidgets="true" 
+								margin="{editorMargin}"
+								focusIn="editorFocusInHandler(event)"
+								change="editorChangeHandler(event)"
+								save="saveHandler(event)"
+								scrollSpeed=".5"
+								useWordWrap="true"
+								showGutter="false"
+								changeCursor="cursorChangeHandler(event)"
+								/>
+		<!--</s:HGroup>-->
+		</mx:HDividedBox>
+		
+	</mx:VDividedBox>
+	
+	<s:BorderContainer width="100%" 
+			  left="0" 
+			  right="0"
+			  bottom="0" 
+			  fontSize="11" 
+			  borderVisible="false">
+		
+			<s:layout>
+				<s:HorizontalLayout verticalAlign="middle" padding="10"/>
+			</s:layout>
+		
+			<s:backgroundFill>
+				<s:SolidColor color="#e8e8e8"/>
+			</s:backgroundFill>
+		
+		<s:Button id="searchButton" 
+				  width="45"
+				  label="&#xE8B6;" 
+				  styleName="iconFont"
+				  toolTip="Search"
+				  click="searchButton_clickHandler(event)"/>
+		
+		<s:Button id="infoButton" 
+				  width="45"
+				  label="&#xE88F;" 
+				  toolTip="Show documentation about the selected item" 
+				  styleName="iconFont"
+				  click="showASDocs()"/>
+		
+		<s:ToggleButton id="showIssuesButton" 
+						width="45"
+						label="&#xE002;"
+						styleName="iconFont"
+						toolTip="Show or hide issues" 
+						click="showIssuesButton_clickHandler(event)"/>
+		
+		<s:ToggleButton id="showExamplesButton" 
+						width="45"
+						label="&#xE896;"
+						styleName="iconFont"
+						toolTip="Show examples" 
+						click="showExamplesButton_clickHandler(event)"/>
+		<!--<s:Button id="addSimpleMXMLButton" label="Simple"
+				  click="addSimpleMXML_clickHandler(event)"/>
+		<s:Button id="addComplexMXMLButton" label="Complex"
+				  click="addComplexMXML_clickHandler(event)"/>
+		<s:Button id="addRichTextMXMLButton" label="RichText"
+				  click="addRichTextMXML_clickHandler(event)"/>-->
+		<s:Button id="clearDocumentButton" 
+				  width="45"
+				  label="&#xE863;" 
+				  toolTip="Reset document" 
+				  styleName="iconFont"
+				  click="clearDocumentButton_clickHandler(event)"/>
+		<s:ToggleButton id="updateOnChangeButton"
+						width="45"
+						label="&#xE86C;"
+						toolTip="Update on change" 
+						styleName="iconFont"
+						click="updateOnChangeButton_clickHandler(event)"/>
+		<s:Button id="updateDocumentButton" 
+				  width="45"
+				  label="&#xE039;"
+				  styleName="iconFont"
+				  toolTip="Render (refresh may be needed)"
+				  enabled="{updateOnChangeButton.selected==false}"
+				  click="updateDocumentButton_clickHandler(event)"/>
+		<s:Button id="saveDocumentButton" 
+				  width="45"
+				  label="&#xE2C3;"
+				  styleName="iconFont"
+				  toolTip="Save the document to the cloud"
+				  click="saveDocumentButton_clickHandler(event)"/>
+		<s:Spacer width="100%"/>
+		<s:Label id="renderTimeLabel" color="#898989" />
+		<s:Label id="cursorLocationLabel" text="" bottom="0" left="10"/>
+		
+		
+		<!--<controls:AceSearchTextInput id="findInput" 
+									 width="125" 
+									 aceEditor="{aceEditor}"
+									 focusThickness="0"
+									 skinClass="com.flexcapacitor.skins.SearchTextInputSkin"/>-->
+	</s:BorderContainer>
+	
+	<s:BorderContainer id="dropImagesLocation" 
+					   width="100%" height="100%" 
+					   backgroundColor="#04527b" 
+					   backgroundAlpha=".75" 
+					   visible="false" >
+		<s:Label text="Drop files here" 
+				 verticalCenter="0" 
+				 horizontalCenter="0" 
+				 fontSize="28" 
+				 color="#ffffff"/>
+	</s:BorderContainer>
+	
+</s:Group>

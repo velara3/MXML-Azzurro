@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" 
+			   xmlns:utils="com.flexcapacitor.utils.*"
+			   xmlns:local="*"
+			   
+			   
+			   minWidth="755" minHeight="200"
+			   preinitialize="application1_initializeHandler(event)"
+			   pageTitle="MXML Renderer"
+			   >
+	
+	<fx:Script>
+		<![CDATA[
+			import com.flexcapacitor.events.HTMLDragEvent;
+			import com.flexcapacitor.utils.DisplayObjectUtils;
+			
+			import mx.events.FlexEvent;
+			
+			/**
+			 * Radiate notes:
+			 *  - add line height style to rich text editor
+			 *  - add code completion to code editor
+			 *  - add xmlns to mxml document export 
+			 *  - fix drag and drop mxml to 
+			 * 
+			 * MXML Editor notes
+			 *  x add save button
+			 *  x creates url
+			 *  x add show search box
+			 *  x add replace box
+			 *  x add save command
+			 *  - add side column list of posts 
+			 *  x move the issues column to left of editor
+			 *  - add color theme
+			 *  x hide gutter
+			 *  x use plain css 
+			 *  x sort class list suggestions
+			 *  - create better UI design
+			 *  - add html preview 
+			 *  - add custom url
+			 * 
+			 * MXML Previewer
+			 *  - create MXML only preview
+			 *  - get Request source, write to page and show
+			 *  - get URL parameter to write to page and show
+			 * 
+			 *  - add both projects to github
+			 * */
+			protected function htmldragmanager1_dragOverHandler(event:HTMLDragEvent):void
+			{
+				mainView.hideEditor();
+				dropIndicator.visible = true;
+				dropIndicator.includeInLayout = true;
+			}
+			
+			protected function htmldragmanager1_dragExitHandler(event:HTMLDragEvent):void
+			{
+				mainView.showEditor();
+				dropIndicator.visible = false;
+				dropIndicator.includeInLayout = false;
+			}
+			
+			protected function application1_initializeHandler(event:FlexEvent):void
+			{
+				ExternalInterface.marshallExceptions = true;
+				HTMLDragManager.debug = true;
+			}
+			
+			protected function htmldragmanager1_dragDropHandler(event:HTMLDragEvent):void {
+				dropIndicator.visible = false;
+				dropIndicator.includeInLayout = false;
+				mainView.showEditor();
+				
+				var fileObject:Object = event.data;
+				var dataURI:String = fileObject.dataURI;
+				var type:String = fileObject.type;
+				var byteArray:ByteArray;
+				var results:String;
+				var string:String;
+				var bitmapData:BitmapData;
+				
+				if (type=="invalid") {
+					return;
+				}
+				
+				// check if mxml or xml
+				if (dataURI.indexOf(HTMLDragManager.APPLICATION_XV_XML)==0 || 
+					dataURI.indexOf(HTMLDragManager.TEXT_PLAIN)==0) {
+					
+					byteArray = DisplayObjectUtils.getByteArrayFromBase64(dataURI);
+					results = byteArray.readUTFBytes(byteArray.length);
+					
+					mainView.setEditorText(results);
+				}
+				else if (dataURI.indexOf(HTMLDragManager.IMAGE)==0) {
+					bitmapData = DisplayObjectUtils.getBitmapDataFromBase64(dataURI);
+					//results = byteArray.readUTFBytes(byteArray.length);
+					//string = "<s:Image source=\"" + dataURI +"\"/>";
+					//mainView.appendText(string);
+					mainView.setBackgroundImage(bitmapData);
+				}
+				
+				if (!(fileObject is String)) {
+					//trace("Dropped " + fileObject.name);
+					//trace(file.dataURI);
+				}
+			}
+			
+			protected function dropIndicator_clickHandler(event:MouseEvent):void
+			{
+				dropIndicator.visible = false;
+				dropIndicator.includeInLayout = false;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Style source="assets/css/fonts.css"/>
+	<fx:Style source="assets/css/styles.css"/>
+	
+	<fx:Declarations>
+		<utils:HTMLDragManager id="htmlDragManager" 
+							   dragDrop="htmldragmanager1_dragDropHandler(event)" 
+							   dragOver="htmldragmanager1_dragOverHandler(event)" 
+							   dragExit="htmldragmanager1_dragExitHandler(event)" 
+							   />
+		<fx:String>
+		<![CDATA[[
+			
+			ERROR: 
+			TypeError: Error #1009: Cannot access a property or method of a null object reference.
+			at mx.managers.systemClasses::MarshallingSupport/get swfBridgeGroup()
+			at mx.managers.systemClasses::MarshallingSupport/hasSWFBridges()
+			at mx.managers.systemClasses::MarshallingSupport/addEventListener()
+			at mx.managers.systemClasses::MarshallingSupport/addEventListenerHandler()
+		
+			SOLUTION: 
+			add marshalling support to compiler arguments
+			-includes=mx.managers.systemClasses.MarshallingSupport 
+			
+			ERROR: 
+			No code complete
+			
+			SOLUTION: 
+			Add -keep-as3-metadata to the compiler argument
+			-keep-as3-metadata+=Alternative
+			-keep-as3-metadata+=ArrayElementType
+			-keep-as3-metadata+=DefaultProperty
+			-keep-as3-metadata+=Deprecated
+			-keep-as3-metadata+=Effect
+			-keep-as3-metadata+=Event
+			-keep-as3-metadata+=HostComponent
+			-keep-as3-metadata+=IconFile
+			-keep-as3-metadata+=Inspectable
+			-keep-as3-metadata+=InstanceType
+			-keep-as3-metadata+=RemoteClass
+			-keep-as3-metadata+=RichTextContent
+			-keep-as3-metadata+=SkinPart
+			-keep-as3-metadata+=SkinState
+			-keep-as3-metadata+=Style
+			-keep-as3-metadata+=SWF
+			
+			ERROR: 
+			ArgumentError: Error #2008: Parameter alignmentBaseline must be one of the accepted values.
+			at flash.text.engine::ElementFormat/set alignmentBaseline()
+			at spark.components::Label/createElementFormat()[/Users/justinmclean/Documents/ApacheFlex4.15/frameworks/projects/spark/src/spark/components/Label.as:605]
+			at spark.components::Label/http://www.adobe.com/2006/flex/mx
+			
+			SOLUTION: 
+			Clean the project. 
+			Calls must be wrapped in a try catch block and validated immediately to catch errors. 
+		]]>
+		</fx:String>
+	</fx:Declarations>
+	<!--
+	<s:Rect width="100%" height="100%">
+		<s:fill>
+			<s:BitmapFill source="@Embed('background.png')" fillMode="repeat"/>
+		</s:fill>
+	</s:Rect>-->
+	
+	<local:MXMLAzzurroMainView id="mainView" width="100%" height="100%"/>
+	
+	<s:BorderContainer id="dropIndicator" 
+					   width="100%" height="100%" 
+					   includeInLayout="false" visible="false"
+					   click="dropIndicator_clickHandler(event)"
+					   >
+		<s:backgroundFill>
+			<s:SolidColor color="#8888FF"/>
+		</s:backgroundFill>
+		<s:Label text="Drop MXML documents here" horizontalCenter="0" verticalCenter="0" fontSize="44"/>
+	</s:BorderContainer>
+	
+</s:Application>

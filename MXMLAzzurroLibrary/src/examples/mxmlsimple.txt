@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" 
+			   xmlns:svg="http://www.w3.org/2000/svg" 
+			   xmlns:xlink="http://www.w3.org/1999/xlink" 
+			   xmlns:fc="library://ns.flexcapacitor.com/flex" 
+			   xmlns:html="http://www.w3.org/1999/xhtml" 
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   
+			   frameRate="30"
+			   minWidth="280"
+			   minHeight="280"
+			   backgroundColor="#FFFFFF"
+			   pageTitle="Example" 
+			   width="100%"
+			   >
+
+	<s:Image fillMode="clip" scaleMode="stretch" horizontalCenter="0" verticalCenter="-25" source="assets/icons/components/Image.png" />
+	<s:Label text="Label" verticalAlign="middle" horizontalCenter="0" verticalCenter="0"/>
+	<s:Button x="124" y="41" label="Button" horizontalCenter="0" verticalCenter="25"/>
+	
+</s:Application>

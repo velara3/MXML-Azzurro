@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   
+					   frameRate="30"
+					   minWidth="720"
+					   minHeight="480"
+					   backgroundColor="#242424"
+					   >
+	
+	<fx:Style source="fonts.css"/>
+	
+	<fx:Style source="styles.css"/>
+	
+	<fx:Style>
+		@namespace s "library://ns.adobe.com/flex/spark";
+		@namespace utils "com.flexcapacitor.utils.*";
+		@namespace mx "library://ns.adobe.com/flex/mx";
+		@namespace components "components.*";
+		
+		s|ToggleSwitch
+		{
+		    accentColor: #3F7FBA;
+		    color: #FFFFFF;
+		    fontSize: 27;
+		}
+		
+	</fx:Style>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			
+			protected function initializeHandler(event:FlexEvent):void {
+				//width = Capabilities.screenResolutionX*.85;
+				//height = Capabilities.screenResolutionY*.88;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<fx:Boolean id="desktop">true</fx:Boolean>
+		<fx:Boolean id="element">true</fx:Boolean>
+	</fx:Declarations>
+	
+	<s:BorderContainer id="mainGroup" width="50%" height="50%" >
+		<s:Button label="Hello world"/>
+	</s:BorderContainer>
+	
+</s:Application>
