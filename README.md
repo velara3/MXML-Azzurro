@@ -9,11 +9,11 @@ Home page:
  - Products - https://www.radii8.com/products
  
 Notes:
- This application uses the following components listed here https://www.radii8.com/blog/?page_id=108. 
+ This application uses the following components.  
  - Ace Editor Component
  - Web Drag and Drop Component
  - VFX Rich Text Editor Component
  - Web Notifications Component
  - Radiate Web Development Studio
  
-Please purchase support contracts for examples and to support Flex development
+These are listed here https://www.radii8.com/blog/?page_id=108. Please consider purchasing support contracts for examples and to support future Flex development
