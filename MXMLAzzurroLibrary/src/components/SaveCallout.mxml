@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Callout xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:clipboard="com.flexcapacitor.effects.clipboard.*" 
+		   xmlns:navigation="com.flexcapacitor.effects.navigation.*"
+		   xmlns:display="com.flexcapacitor.effects.display.*" 
+		   xmlns:status="com.flexcapacitor.effects.status.*" 
+		   xmlns:prompt="com.flexcapacitor.effects.prompt.*" 
+		   xmlns:handlers="com.flexcapacitor.handlers.*" 
+		   xmlns:core="com.flexcapacitor.effects.core.*" 
+		   xmlns:utils="com.flexcapacitor.utils.*" 
+		   xmlns:controller="controller.*" 
+		   xmlns:components="components.*" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   
+		   contentBackgroundAppearance="flat"
+           horizontalPosition="middle"
+           verticalPosition="before" 
+		   >
+	
+	<!--
+	Using effects would cause the callout to fade out immediately after a second call.
+	showEffect="Fade"
+	hideEffect="Fade" 
+	-->
+	
+	<fx:Style>
+		{
+			modalTransparency:.75;
+			modalTransparencyColor:0;
+			modalTransparencyBlur:0;
+			modalTransparencyDuration:500;
+		}
+		.uppercase {
+			typographicCase: uppercase;
+		}
+		#description {
+			borderAlpha:.5;
+		}
+	</fx:Style>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.events.ValidationResultEvent;
+			
+			import spark.events.PopUpEvent;
+			protected function save_clickHandler(event:MouseEvent):void {
+				
+				if (title.text == "") {
+					var validationResultEvent:ValidationResultEvent = validateTitle.validate();
+					
+					return;
+				}
+				var form:Object = {title:title.text, description:description.text};
+				close(false, form);
+			}
+			
+			protected function cancelButton_clickHandler(event:MouseEvent):void
+			{
+				title.errorString = "";
+				//var validEvent:ValidationResultEvent;
+				//validEvent = new ValidationResultEvent(ValidationResultEvent.VALID);
+				//validateTitle.dispatchEvent(validEvent); 
+				close();
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<mx:StringValidator id="validateTitle" 
+							source="{title}" 
+							property="text" 
+							required="true" 
+							minLength="2" 
+							requiredFieldError="Title is required"/>
+		
+	</fx:Declarations>
+	
+	<s:layout>
+		<s:VerticalLayout paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10"/>
+	</s:layout>
+    
+	
+	<s:TextInput id="title" 
+				 prompt="Title" 
+				 width="100%"
+				  />
+	
+	<s:TextArea id="description" 
+				height="60" 
+				width="280"
+				prompt="Description (Optional)"
+				/>
+	
+	<s:HGroup width="100%">
+		
+		<s:Button id="cancelButton" 
+				  label="Cancel" 
+				  width="100%"
+				  styleName="sliderLabel" 
+				  click="cancelButton_clickHandler(event)"
+				  />
+		
+		<s:Button id="saveButton" 
+				  label="Save" 
+				  width="100%"
+				  styleName="sliderLabel" 
+				  click="save_clickHandler(event)"
+				  />
+	</s:HGroup>
+
+</s:Callout>

@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:controls="com.flexcapacitor.controls.*"
+			   xmlns:mx="library://ns.adobe.com/flex/mx" 
+			   
+			   minWidth="50" minHeight="50" 
+			   applicationComplete="applicationCompleteHandler(event)"
+			   enterFrame="application1_enterFrameHandler(event)"
+			   >
+	
+	<fx:Script>
+		<![CDATA[
+			import com.flexcapacitor.controller.Radiate;
+			import com.flexcapacitor.managers.CodeManager;
+			import com.flexcapacitor.managers.HistoryManager;
+			import com.flexcapacitor.model.Document;
+			import com.flexcapacitor.model.IDocument;
+			import com.flexcapacitor.model.IssueData;
+			import com.flexcapacitor.model.SourceData;
+			import com.flexcapacitor.model.TranscoderDescription;
+			import com.flexcapacitor.services.IServiceEvent;
+			import com.flexcapacitor.services.IWPServiceEvent;
+			import com.flexcapacitor.services.WPService;
+			import com.flexcapacitor.services.WPServiceEvent;
+			import com.flexcapacitor.utils.ClassUtils;
+			import com.flexcapacitor.utils.DocumentTranscoder;
+			import com.flexcapacitor.utils.MXMLDocumentImporter;
+			import com.flexcapacitor.utils.XMLUtils;
+			
+			import flash.utils.getTimer;
+			
+			import mx.events.BrowserChangeEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.BrowserManager;
+			import mx.managers.IBrowserManager;
+			
+			public var coreClasses:Object;
+			public var mxClasses:MxClasses;
+			public var sparkClasses:SparkClasses;
+			public var experimentalClasses:ExperimentalClasses;
+			//public var sparkClasses:SparkClasses;
+			
+			public var iDocument:IDocument;
+			public var pendingCode:String;
+			public var updateNeeded:Boolean;
+			public var updateNeededTime:int;
+			public var mxmlDocumentImporter:MXMLDocumentImporter;
+			
+			public var transcoder:TranscoderDescription;
+			public var importer:DocumentTranscoder;
+			public var sourceData:SourceData;
+			
+			private var host:String;
+			
+			private var loadService:WPService;
+			private var loadSuccessful:Boolean;
+			private var loadInProgress:Boolean;
+			
+			private var browserManager:IBrowserManager;
+			
+			protected function applicationCompleteHandler(event:FlexEvent = null):void {
+				//textArea.text = message;
+				
+				XMLUtils.initialize();
+				
+				var hasDefinition:Boolean;
+				var appXML:XML;
+				var ns:Namespace;
+				var version:String;
+				
+				version = "1.0.0";
+				
+				CodeManager.setTranscodersVersion(version);
+				Radiate.initialize();
+				
+				//host = Radiate.getWPHostURL();
+				host = "https://www.radii8.com/snippets/";
+				
+				var transcoderDescription:TranscoderDescription = new TranscoderDescription();
+				var item:XML = <transcoder type="mxml" label="MXML" importLabel="MXML Importer" supportsImport="true" supportsExport="false" 
+								classPath="com.flexcapacitor.utils.MXMLDocumentImporter" 
+								extension="mxml" />;
+				
+				transcoderDescription.importXML(item);
+				
+				hasDefinition = ClassUtils.hasDefinition(transcoderDescription.classPath);
+				
+				if (hasDefinition) {
+					CodeManager.registerTranscoder(transcoderDescription);
+				}
+				
+				
+				if (iDocument==null) {
+					iDocument = new Document();
+				}
+				if (iDocument.instance==null && applicationLoader.targetApplication) {
+					iDocument.instance = applicationLoader.targetApplication;
+				}
+				
+				Radiate.instance.selectedDocument = iDocument;
+				
+				HistoryManager.doNotAddEventsToHistory = true;
+				
+				setupServices();
+				
+				setupBrowserManager();
+				
+				browserURLChange();
+				
+				checkFXTData();
+			}
+			
+			private function setupServices():void {
+				
+				if (loadService==null) {
+					loadService = new WPService();
+					loadService.host = host;
+					loadService.addEventListener(WPServiceEvent.RESULT, loadResultsHandler);
+					loadService.addEventListener(WPServiceEvent.FAULT, loadFaultHandler);
+				}
+			}
+			
+			private function setupBrowserManager():void {
+				browserManager = BrowserManager.getInstance();
+				browserManager.addEventListener(BrowserChangeEvent.BROWSER_URL_CHANGE, browserURLChange);
+				browserManager.init("", "");
+			}
+			
+			/**
+			 * Check the URL when the page loads to see if there is a post
+			 * */
+			private function browserURLChange(event:BrowserChangeEvent = null):void {
+				var fragment:String = browserManager.fragment;
+				
+				if (fragment) {
+					getDocument(fragment);
+				}
+			}
+			
+			/**
+			 * Check to see if there is FXT data
+			 * */
+			private function checkFXTData():void {
+				var fragment:String = browserManager.fragment;
+				var elementIdentity:String = "fxt";
+				
+				if (fragment=="" || fragment==null) {
+					
+					if (ExternalInterface.available) {
+						var string:String = fxtFunction;
+						var results:String;
+						results = ExternalInterface.call(string, elementIdentity);
+						if (results!="false" && results!="") {
+							pendingCode = results;
+							invalidateDesignView();
+						}
+					}
+				}
+			}
+			
+			/**
+			 * Get a snippet on the server
+			 * */
+			private function getDocument(fragment:String = ""):void {
+				var form:URLVariables;
+				var object:URLVariables;
+				
+				loadSuccessful = false;
+				loadInProgress = true;
+				
+				object = new URLVariables();
+				
+				//object.id = postID;
+				object.url = fragment;
+				
+				loadService.call = "Get post";
+				renderTimeLabel.text = "Loading";
+				//savingStatusGroup.visible = true;
+				// save project
+				loadService.send("snippets", "get_snippet", null, form);				
+			}
+			
+			/**
+			 * Result from load result
+			 * */
+			public function loadResultsHandler(event:IWPServiceEvent):void {
+				var data:Object = event.data;
+				var post:Object = data ? data.post : null;
+				
+				if (post) {
+					var uri:String = post.url;
+					var status:String = post.status;
+					var customFields:Object = post.custom_fields;
+					var source:String = browserManager ? customFields.source : null;
+					pendingCode = source;
+					invalidateDesignView();
+					renderTimeLabel.text = "";
+				}
+				else {
+					renderTimeLabel.text = "Not loaded";
+				}
+				
+			}
+			
+			/**
+			 * Result from load fault
+			 * */
+			public function loadFaultHandler(event:IServiceEvent):void {
+				var errorEvent:Object = loadService && "errorEvent" in loadService ? WPService(loadService).errorEvent : null;
+				var errorID:int;
+				var errorText:String;
+				var errorType:String;
+				var results:String;
+				
+				if (errorEvent) {
+					errorText = "text" in errorEvent ? errorEvent.text : "";
+					errorText = "message" in errorEvent ? errorEvent.message : errorText;
+					errorID = "errorID" in errorEvent ? errorEvent.errorID : 0;
+					errorType = "type" in errorEvent ? errorEvent.type : "";
+					results = "Error when saving document: "+ name + ". You may be disconnected. Check your connection and try again";
+				}
+				else {
+					results = "Error when trying to save document: "+ name;
+				}
+				
+			}
+			
+			protected function applicationLoader_completeHandler(event:Event):void {
+				//trace("application loaded");
+				if (iDocument==null) {
+					iDocument = new Document();
+					//iDocument.instance = applicationLoader.targetApplication;
+				}
+				
+				iDocument.instance = applicationLoader.targetApplication;
+				Radiate.instance.selectedDocument = iDocument;
+				//Radiate.setTarget(iDocument.instance);
+				if (pendingCode) {
+					//aceEditor.text = pendingCode;
+					invalidateDesignView();
+					//pendingCode = null;
+				}
+				applicationLoader.targetApplication.focusManager.activate();
+			}
+			
+			/**
+			 * This method lets us show a status indication while rendering
+			 * */
+			public function invalidateDesignView():void {
+				renderTimeLabel.text = "Rendering...";
+				renderTimeLabel.validateNow();
+				
+				// we check on the next frame if any updates are needed 
+				updateNeeded = true;
+				updateNeededTime = getTimer();
+				//callLater(updateView);
+			}
+			
+			protected function applicationLoader_resetHandler(event:Event):void {
+				if (pendingCode) {
+					pendingCode = null;
+					invalidateDesignView();
+				}
+			}
+			
+			protected function application1_enterFrameHandler(event:Event):void
+			{
+				var diff:int = getTimer()-updateNeededTime;
+				
+				if (updateNeeded && diff>50) {
+					//trace("updating the view");
+					updateView();
+					updateNeeded = false;
+				}
+				
+			}
+			
+			
+			/**
+			 * Updates the view. We could move this to another thread
+			 * */
+			public function updateView():void {
+				if (iDocument==null || iDocument.instance==null) return; // not loaded yet
+				var error:IssueData;
+				var code:String;
+				var time:int;
+				
+				code = pendingCode;
+				//trace("Inside updating the view");
+				if (transcoder==null) {
+					transcoder = CodeManager.getImporter(CodeManager.MXML);
+					importer = transcoder.importer;
+					importer.removeAllOnImport = true;
+					importer.makeInteractive = true;
+					importer.useStrict = true;
+				}
+				
+				time = getTimer();
+				
+				sourceData = importer.importare(code, iDocument);
+				
+				time = getTimer()-time;
+				//renderTimeLabel.text = time + "ms";
+				
+				if (sourceData.errors && sourceData.errors.length) {
+					error = sourceData.errors[0] as IssueData;
+					renderTimeLabel.text = error.toString();
+					//showMessage(error.label, error.description, error.line, error.column, false);
+				}
+				else {
+					renderTimeLabel.text = "";
+				}
+				
+				pendingCode = null;
+				
+				updateNeeded = false;
+			}
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		
+		<fx:XML id="fxtFunction">
+			<xml><![CDATA[
+				function(id, objectId) {
+					var element = document.getElementById(id);
+					console.log(element);
+					
+					if (element==null) {
+						return false;
+					}
+					
+					return element.innerHTML;
+				}
+			]]></xml>
+			
+		</fx:XML>
+	</fx:Declarations>
+	
+	
+	<controls:ApplicationLoader id="applicationLoader" width="100%" height="100%"
+								reset="applicationLoader_resetHandler(event)"
+								applicationComplete="applicationLoader_completeHandler(event)"/>
+	
+	<s:Label id="renderTimeLabel" color="#898989" />
+</s:Application>

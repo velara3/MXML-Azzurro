@@ -9,6 +9,7 @@
 					   xmlns:handlers="com.flexcapacitor.handlers.*" 
 					   xmlns:window="com.flexcapacitor.effects.window.*" 
 					   xmlns:supportClasses="com.flexcapacitor.controls.supportClasses.*"
+					   xmlns:components1="components.*" 
 					   xmlns:local="*"
 					   
 					   stateChangeComplete="stateChangeCompleteHandler(event)"
@@ -63,8 +64,11 @@
 			import mx.managers.IBrowserManager;
 			import mx.utils.Platform;
 			
+			import spark.collections.Sort;
+			import spark.collections.SortField;
 			import spark.components.Application;
 			import spark.components.WindowedApplication;
+			import spark.events.PopUpEvent;
 			
 			import flashx.textLayout.tlf_internal;
 			import flashx.textLayout.conversion.ITextImporter;
@@ -290,6 +294,7 @@
 				
 				//host = Radiate.getWPHostURL();
 				host = "https://www.radii8.com/snippets/";
+				viewerHost = "https://www.radii8.com/viewer/";
 				
 				if (!Platform.isBrowser) {
 					Radiate.addComponentDefinition("WindowedApplication", "spark.components.WindowedApplication", WindowedApplication);
@@ -418,7 +423,11 @@
 			public var jumpingToMatching:Boolean;
 			public var tokenInfo:TokenInformation;
 			
-			protected function cursorChangeHandler(event:AceEvent):void {
+			public var showToken:Boolean = false;
+			public var showEntity:Boolean = false;
+			public var showClassFound:Boolean = false;
+			
+			protected function cursorChangeHandler(event:AceEvent = null):void {
 				var cursorString:String;
 				var cursor:Object;
 				var token:Object;
@@ -428,7 +437,8 @@
 				var isMultiline:Boolean;
 				var isMouseDown:Boolean;
 				var tokenText:String = "";
-				var showToken:Boolean = true;
+				var entityText:String = "";
+				var classFoundText:String = "";
 				
 				//PerformanceMeter.mark("Start", true);
 				isMultiline = aceEditor.isSelectionMultiline();
@@ -448,16 +458,25 @@
 				
 				if (type!=null) {
 					cursorString = aceEditor.getCursorString(cursor);
+					entity = tokenInfo.entity ? tokenInfo.entity : "none";
 					
 					if (showToken) {
 						tokenText = " Token: " + type;
 					}
 					
+					if (showEntity) {
+						entityText = " Entity: " + entity;
+					}
+					
+					if (showClassFound) {
+						classFoundText = " Class found: false" ;
+					}
+					
 					if (tokenInfo.classFound==false) {
-						output = cursorString + "   Entity: " + tokenInfo.entity + "   Class found: false" + tokenText;
+						output = cursorString + entityText + classFoundText + tokenText;
 					}
 					else {
-						output = cursorString + "   Entity: " + tokenInfo.entity + tokenText;
+						output = cursorString + entityText + tokenText;
 					}
 					
 					if ("statusText" in parentApplication) {
@@ -599,11 +618,6 @@
 				invalidateDesignView();
 			}
 			
-			protected function saveDocumentButton_clickHandler(event:MouseEvent):void
-			{
-				postDocument();
-			}
-			
 			public var deferredState:String;
 			
 			protected function showIssuesButton_clickHandler(event:MouseEvent):void {
@@ -628,7 +642,13 @@
 				}
 			}
 			
+			/**
+			 * Service to get list of example projects
+			 * */
+			public var getExampleProjectsService:WPService;
+			
 			protected function showExamplesButton_clickHandler(event:MouseEvent):void {
+				var count:int = 100;
 				
 				if (currentState!=EXAMPLES) {
 					if (currentState != NORMAL) {
@@ -640,6 +660,59 @@
 				}
 				
 				callLater(showExamples);
+				
+				if (examplesService==null) {
+					examplesService = new WPService();
+					examplesService.addEventListener(WPService.RESULT, getExampleProjectsResultsHandler, false, 0, true);
+					examplesService.addEventListener(WPService.FAULT, getExampleProjectsFaultHandler, false, 0, true);
+					examplesService.host = host;
+				}
+				
+			}
+			
+			/**
+			 * Results from call to get projects
+			 * */
+			public function getExampleProjectsResultsHandler(event:IServiceEvent):void {
+				var data:Object = event.data;
+				examplesCollection.source = parseProjectsData(data);
+			}
+			
+			/**
+			 * Result example projects fault
+			 * */
+			public function getExampleProjectsFaultHandler(event:IServiceEvent):void {
+				var data:Object = event.data;
+			}
+			
+			/**
+			 * Parses data into an array of usable objects 
+			 * Should be in a ServicesManager class?
+			 * */
+			public function parseProjectsData(data:Object):Array {
+				var dataLength:int;
+				var post:Object;
+				var potentialProjects:Array = [];
+				var snippet:Snippet;
+				
+				dataLength = data && data is Object ? data.count : 0;
+				
+				for (var i:int;i<dataLength;i++) {
+					post = data.posts[i];
+					snippet = new Snippet();
+					snippet.name = post.title;
+					snippet.description = post.content;
+					snippet.dateString = post.date;
+					snippet.source = post.custom_fields.source;
+					//source = post.custom_fields.source;
+					potentialProjects.push(snippet);
+				}
+				
+				var sort:Sort = new Sort();
+				var sortField:SortField = new SortField("dateSaved");
+				sort.fields = [sortField];
+				
+				return potentialProjects;
 			}
 			
 			public function showExamples():void {
@@ -696,8 +769,7 @@
 				//callLater(updateView);
 			}
 			
-			protected function windowedapplication1_enterFrameHandler(event:Event):void
-			{
+			protected function windowedapplication1_enterFrameHandler(event:Event):void {
 				var diff:int = getTimer()-updateNeededTime;
 				
 				if (updateNeeded && diff>50) {
@@ -843,8 +915,14 @@
 				}
 			}
 			
-			public function setEditorText(text:String, update:Boolean = true):void {
-				applicationLoader.resetApplication();
+			public function setEditorText(text:String, update:Boolean = true, clean:Boolean = false):void {
+				if (clean) {
+					applicationLoader.resetApplication();
+					pendingCode = text;
+				}
+				else {
+					applicationLoader.resetApplication();
+				}
 				aceEditor.text = text;
 				aceEditor.validateNow();
 				aceEditor.resetUndoHistory();
@@ -885,6 +963,7 @@
 						currentState = NORMAL;
 						firstChild.width = 200;
 						showIssuesButton.selected = false;
+						showExamplesButton.selected = false;
 					}
 					else if (firstChild.alpha==0) {
 						//firstChild.alpha = 1;
@@ -933,9 +1012,11 @@
 			}
 			
 			private var host:String;
+			private var viewerHost:String;
 			
 			private var loadService:WPService;
 			private var saveService:WPService;
+			private var examplesService:WPService;
 			private var saveSuccessful:Boolean;
 			private var saveInProgress:Boolean;
 			private var loadSuccessful:Boolean;
@@ -944,13 +1025,22 @@
 			/**
 			 * Saves the snippet to the server
 			 * */
-			private function postDocument():void {
+			private function postDocument(title:String = "", description:String = ""):void {
 				var form:URLVariables;
 				
 				saveSuccessful = false;
 				saveInProgress = true;
 				
 				form = toSaveFormObject();
+				
+				if (title!=null) {
+					form.title = title;
+				}
+				
+				if (description) {
+					form.content = description;
+				}
+				
 				saveService.call = "Post call";
 				savingStatus.text = "Saving";
 				savingStatusGroup.visible = true;
@@ -1023,7 +1113,7 @@
 					saveSuccessful = false;
 				}
 				
-				setTimeout(removeSaveLabel, 5000);
+				setTimeout(removeSaveLabel, 3000);
 				
 				saveInProgress = false;
 			}
@@ -1146,7 +1236,6 @@
 			 * */
 			private function browserURLChange(event:BrowserChangeEvent = null):void {
 				var fragment:String = browserManager.fragment;
-				var object:URLVariables = new URLVariables();
 				
 				if (fragment) {
 					getDocument(fragment);
@@ -1234,14 +1323,14 @@
 				examplesCollection.addItem(snippet);
 				
 				snippet = new Snippet();
-				snippet.name = "Rich Text";
-				snippet.source = embeddedRichTextMXML.value;
+				snippet.name = "Complex";
+				snippet.source = embeddedComplexMXML.value;
 				
 				examplesCollection.addItem(snippet);
 				
 				snippet = new Snippet();
-				snippet.name = "Complex";
-				snippet.source = embeddedComplexMXML.value;
+				snippet.name = "Rich Text";
+				snippet.source = embeddedRichTextMXML.value;
 				
 				examplesCollection.addItem(snippet);
 				
@@ -1256,51 +1345,175 @@
 				}
 			}
 			
+			protected function viewDocumentButton_clickHandler(event:MouseEvent):void {
+				/*
+				//if (!htmlOptions) {
+				var language:String = "HTML";
+				var htmlOptions:HTMLExportOptions;
+				htmlOptions = CodeManager.getExportOptions(language) as HTMLExportOptions;
+				//}
+				
+				//htmlOptions.template = html5boilerplate;
+				//htmlOptions.bordersCSS = bordersCSS;
+				htmlOptions.showBorders = showBorders;
+				//htmlOptions.useBorderBox = useBoderBox;
+				htmlOptions.useInlineStyles = setStylesInline.selected;
+				htmlOptions.template = iDocument.template;
+				htmlOptions.disableTabs = true;
+				htmlOptions.useExternalStylesheet = false;
+				htmlOptions.exportChildDescriptors = showChildDescriptors.selected;
+				htmlOptions.reverseInitialCSS = true;
+				
+				if (updateCodeLive.selected && isCodeModifiedByUser) {
+					htmlOptions.useCustomMarkup = true;
+					htmlOptions.markup = aceEditor.text;
+					htmlOptions.styles = aceCSSEditor.text;
+				}
+				else {
+					htmlOptions.useCustomMarkup = false;
+					htmlOptions.markup = "";
+					htmlOptions.styles = "";
+				}
+				
+				options = htmlOptions;
+				
+				sourceData = CodeManager.getSourceData(target, iDocument, language, options);
+				
+				output = sourceData.source;
+ 				iDocument.errors = sourceData.errors;
+				iDocument.warnings = sourceData.warnings;
+				
+				//if (radiate.isPreviewDocumentVisible() && updateCodeLive.selected && isCodeModifiedByUser) {
+				if (updateCodeLive.selected && isCodeModifiedByUser) {
+					if (language==CodeManager.HTML) {
+						updateHTMLPreview();
+					}
+				}
+				else {
+					setEditorText(sourceData);
+					
+					if (radiate.isPreviewDocumentVisible() && language==CodeManager.HTML) {
+						updateHTMLPreview();
+					}
+				}
+				*/
+				
+				if (ExternalInterface.available) {
+					var fragment:String = browserManager.fragment;
+					var currentURL:String;
+					var viewerURL:String;
+					var request:URLRequest;
+					var object:URLVariables;
+					
+					currentURL = ExternalInterface.call(getURL);
+					//viewerURL = currentURL.replace("/mxml/", "/viewer/");
+					
+					if (fragment!="") {
+						viewerURL = viewerHost + "#" + fragment;
+						request = new URLRequest(viewerURL);
+						navigateToURL(request);
+					}
+					else {
+						return;
+						object = new URLVariables();
+						request = new URLRequest(viewerHost);
+						//object.source = encodeURIComponent(aceEditor.text);
+						object.source = aceEditor.text;
+						request.data = object;
+						navigateToURL(request);
+					}
+				}
+				
+			}
+			
+			protected function shareDocumentButton_clickHandler(event:MouseEvent):void {
+				aceEditor.visible = false;
+				var viewerURL:String;
+				var currentURL:String;
+				
+				if (shareCallout.isOpen) {
+					shareCallout.close();
+				}
+				else {
+					currentURL = ExternalInterface.call(getURL);
+					viewerURL = currentURL.replace("/mxml/", "/viewer/");
+					shareCallout.url = currentURL;
+					shareCallout.viewerURL = viewerURL;
+					shareCallout.open(shareDocumentButton, true);
+				}
+			}
+			
+			protected function shareCallout_closeHandler(event:PopUpEvent):void
+			{
+				if (aceEditor.includeInLayout == true) {
+					setTimeout(aceEditor.setVisible, 500, true);
+				}
+				// trace("Closing");
+				//shareCallout.isOpen = false;
+			}
+			
+			
+			protected function saveDocumentButton_clickHandler(event:MouseEvent):void {
+				aceEditor.visible = false;
+				
+				if (saveCallout.isOpen) {
+					saveCallout.close();
+				}
+				else {
+					saveCallout.open(saveDocumentButton, true);
+				}
+			}
+			
+			protected function saveCallout_closeHandler(event:PopUpEvent):void {
+				var result:Object = event.data;
+				
+				if (aceEditor.includeInLayout == true) {					
+					setTimeout(aceEditor.setVisible, 500, true);
+				}
+				
+				if (result) {
+					postDocument(result.title, result.description);
+				}
+				// trace("Closing");
+				//shareCallout.isOpen = false;
+			}
+			
+			protected function cursorLocationLabel_clickHandler(event:MouseEvent):void
+			{
+				if (showEntity==false) {
+					showEntity = true;
+					showToken = false;
+				}
+				else if (showToken && showEntity) {
+					showToken = false;
+					showEntity = false;
+				}
+				else if (showEntity==true) {
+					showToken = true;
+				}
+				else {
+					showToken = true;
+				}
+				
+				cursorChangeHandler();
+			}
+			
+			protected function examplesList_doubleClickHandler(event:MouseEvent):void {
+				var count:int = 100;
+				examplesService.getPosts(null, null, count);				
+			}
+			
 		]]>
 	</fx:Script>
 	
 	
 	<fx:Declarations>
-		
-		<fx:XML id="schemaTest">
-			<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" 
-					   targetNamespace="http://www.w3schools.com"
-					   xmlns="http://www.w3schools.com"
-					   elementFormDefault="qualified">
-				
-				<xs:element name="shiporder">
-					<xs:complexType>
-						<xs:sequence>
-							<xs:element name="orderperson" type="xs:string"/>
-							<xs:element name="shipto">
-								<xs:complexType>
-									<xs:sequence>
-										<xs:element name="name" type="xs:string"/>
-										<xs:element name="address" type="xs:string"/>
-										<xs:element name="city" type="xs:string"/>
-										<xs:element name="country" type="xs:string"/>
-									</xs:sequence>
-								</xs:complexType>
-							</xs:element>
-							<xs:element name="item" maxOccurs="unbounded">
-								<xs:complexType>
-									<xs:sequence>
-										<xs:element name="title" type="xs:string"/>
-										<xs:element name="note" type="xs:string" minOccurs="0"/>
-										<xs:element name="quantity" type="xs:positiveInteger"/>
-										<xs:element name="price" type="xs:decimal"/>
-									</xs:sequence>
-								</xs:complexType>
-							</xs:element>
-						</xs:sequence>
-						<xs:attribute name="orderid" type="xs:string" use="required"/>
-					</xs:complexType>
-				</xs:element>
-				
-			</xs:schema> 
-		</fx:XML>
-		
-		
+		<fx:String id="getURL">
+		<![CDATA[
+			function() {
+				return document.location.href;
+			}
+		]]></fx:String>
 		
 		<fx:String id="Errors">
 			<![CDATA[
@@ -1330,6 +1543,9 @@
 		<model:EmbeddedFile id="embeddedSimpleMXML" file='@Embed("./examples/mxmlSimple.txt",mimeType="application/octet-stream")'/>
 		<model:EmbeddedFile id="embeddedRichTextMXML" file='@Embed("./examples/mxmlRichText.txt",mimeType="application/octet-stream")'/>
 		<model:EmbeddedFile id="embeddedMXMLBrowser" file='@Embed("./examples/mxmlbrowser.txt",mimeType="application/octet-stream")'/>
+		
+		<components1:ShareCallout id="shareCallout" close="shareCallout_closeHandler(event)"/>
+		<components1:SaveCallout id="saveCallout" close="saveCallout_closeHandler(event)"/>
 		
 		<utils:MiniInspector/>
 	</fx:Declarations>
@@ -1493,6 +1709,7 @@
 				  width="100%" >-->
 			<s:Group id="issuesInspectorGroup" height="100%" includeIn="sidebar" itemCreationPolicy="immediate" width="200">
 				<supportClasses:IssuesInspector id="issuesInspector" 
+												borderVisible="true"
 												width="100%" height="100%"
 												change="issuesInspector_changeHandler(event)"
 												top="0"
@@ -1510,13 +1727,16 @@
 			<s:Group id="examplesGroup" height="100%" includeIn="examples" itemCreationPolicy="immediate" width="200">
 				<s:List id="examplesList" 
 						width="100%" height="100%"
-						change="examplesList_changeHandler(event)"
-						click="examplesList_changeHandler(event)"
+						doubleClickEnabled="true" 
 						labelField="name"
 						top="0"
-						bottom="0">
-					
+						bottom="0"
+						doubleClick="examplesList_doubleClickHandler(event)"
+						change="examplesList_changeHandler(event)"
+						click="examplesList_changeHandler(event)"
+						>
 				</s:List>
+					
 				<s:Label y="25" 
 						 text="No examples" 
 						 color="#787878" 
@@ -1621,9 +1841,22 @@
 				  styleName="iconFont"
 				  toolTip="Save the document to the cloud"
 				  click="saveDocumentButton_clickHandler(event)"/>
+		<s:Button id="shareDocumentButton" 
+				  width="45"
+				  label="&#xE80D;"
+				  styleName="iconFont"
+				  toolTip="Share the document"
+				  click="shareDocumentButton_clickHandler(event)"/>
+		<s:Button id="webViewerDocumentButton" 
+				  width="45"
+				  label="&#xE0E2;"
+				  styleName="iconFont"
+				  toolTip="View the document in the viewer"
+				  click="viewDocumentButton_clickHandler(event)"/>
 		<s:Spacer width="100%"/>
 		<s:Label id="renderTimeLabel" color="#898989" />
-		<s:Label id="cursorLocationLabel" text="" bottom="0" left="10"/>
+		<s:Label id="cursorLocationLabel" text="" bottom="0" left="10"
+				 click="cursorLocationLabel_clickHandler(event)"/>
 		
 		
 		<!--<controls:AceSearchTextInput id="findInput" 

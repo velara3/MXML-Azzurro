@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
-			   xmlns:s="library://ns.adobe.com/flex/spark" 
-			   xmlns:mx="library://ns.adobe.com/flex/mx" 
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
 			   xmlns:utils="com.flexcapacitor.utils.*"
 			   xmlns:local="*"
-			   
-			   
-			   minWidth="755" minHeight="200"
+			   minWidth="755" minHeight="200" pageTitle="MXML Azzurro"
 			   preinitialize="application1_initializeHandler(event)"
-			   pageTitle="MXML Azzurro"
-			   >
+			   viewSourceURL="srcview/index.html">
 	
 	<fx:Script>
 		<![CDATA[
@@ -42,11 +39,11 @@
 			 *  - add custom url
 			 * 
 			 * MXML Previewer
-			 *  - create MXML only preview
-			 *  - get Request source, write to page and show
-			 *  - get URL parameter to write to page and show
+			 *  x create MXML only preview
+			 *  x get Request source, write to page and show
+			 *  x get URL parameter to write to page and show
 			 * 
-			 *  - add both projects to github
+			 *  x add both projects to github
 			 * */
 			protected function htmldragmanager1_dragOverHandler(event:HTMLDragEvent):void
 			{

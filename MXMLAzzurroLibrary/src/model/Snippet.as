@@ -11,5 +11,8 @@ package model
 		public var source:String;
 		public var id:String;
 		public var data:Object;
+		public var path:String;
+		public var date:Date;
+		public var dateString:String;
 	}
 }

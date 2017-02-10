@@ -6,15 +6,25 @@
 					   xmlns:window="com.flexcapacitor.effects.window.*" 
 					   xmlns:local="*"
 					   
+					   minWidth="755" minHeight="200" 
 					   uncaughtError="uncaughtErrorHandler(event)"
 					   initialize="creationCompleteHandler(event)"
-					   minWidth="755" minHeight="200" 
+					   invoke="windowedapplication1_invokeHandler(event)"
+					   dragOver="mainView_dragOverHandler(event)"
+					   dragDrop="mainView_dragDropHandler(event)"
+					   dragExit="mainView_dragExitHandler(event)" 
 					   >
 	
 	<fx:Script>
 		<![CDATA[
+			import com.flexcapacitor.controller.Radiate;
+			
 			import mx.controls.HTML;
-			import mx.events.FlexEvent;HTML;
+			import mx.core.DragSource;
+			import mx.core.IUIComponent;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.DragManager;HTML;
 			
 			protected function uncaughtErrorHandler(event:UncaughtErrorEvent):void
 			{
@@ -28,6 +38,151 @@
 				setActualSize(width, height);
 			}
 			
+			
+			protected function windowedapplication1_invokeHandler(event:InvokeEvent):void {
+				var invokeArguments:Array = event.arguments;
+				var filePath:String;
+				var stream:FileStream;
+				var file:File;
+				var testing:Boolean = false;
+				
+				
+				// application icon had a file dropped on it or an associated file was double clicked
+				if (event.reason == InvokeEventReason.STANDARD && invokeArguments.length) {
+					
+					//showMessage("invoking with arguments" +  ObjectUtil.toString(invokeArguments));
+					invokeWithFile(event.currentDirectory, invokeArguments);
+				}
+				
+				// application opened normally 
+				if (event.reason == InvokeEventReason.STANDARD && invokeArguments.length == 0) {
+					//invokeWithFile(event.currentDirectory, invokeArguments);
+					
+					return;
+				}
+				
+				// application opened at login
+				if (event.reason == InvokeEventReason.LOGIN) {
+					return;
+				}
+				
+				// application opened from URL
+				if (event.reason == InvokeEventReason.OPEN_URL) {
+					return;
+				}
+				
+				// application opened from notification such as iOS APN
+				if (event.reason == InvokeEventReason.NOTIFICATION) {
+					return;
+				}
+			}
+			
+			protected function mainView_dragOverHandler(event:DragEvent):void {
+				
+				if (event.dragInitiator==null && Radiate.isAcceptableDragAndDropFormat(event.dragSource)) {
+					DragManager.acceptDragDrop(IUIComponent(event.currentTarget));
+					dropIndicator.includeInLayout = true;
+					dropIndicator.visible = true;
+				}
+				
+			}
+			
+			public function mainView_dragDropHandler(event:DragEvent):void {
+				var dragSource:DragSource;
+				var hasFileListFormat:Boolean;
+				var hasFilePromiseListFormat:Boolean;
+				var hasURLFormat:Boolean;
+				var isSelf:Boolean;
+				var AIR_URL:String = "air:url";
+				var isHTMLPreviewOpen:Boolean;
+				var destination:Object;
+				var droppedFiles:Array;
+				
+				AIR_URL = ClipboardFormats.URL_FORMAT;
+				
+				dragSource = event.dragSource;
+				hasFileListFormat = dragSource.hasFormat(ClipboardFormats.FILE_LIST_FORMAT);
+				hasFilePromiseListFormat = dragSource.hasFormat(ClipboardFormats.FILE_PROMISE_LIST_FORMAT);
+				hasURLFormat = dragSource.hasFormat(AIR_URL);
+				
+				
+				if (hasFileListFormat) {
+					droppedFiles = dragSource.dataForFormat(ClipboardFormats.FILE_LIST_FORMAT) as Array;
+				}
+				else if (hasFilePromiseListFormat) {
+					droppedFiles = dragSource.dataForFormat(ClipboardFormats.FILE_PROMISE_LIST_FORMAT) as Array;
+				}
+				
+				var currentDirectory:File;
+				var currentFile:File;
+				
+				if (droppedFiles.length) {
+					currentFile = droppedFiles[0] as File;
+					currentDirectory = currentFile.parent;
+					
+					// reuse invoke with file
+					invokeWithFile(currentDirectory, [currentFile.nativePath]);
+				}
+				
+				dropIndicator.includeInLayout = false;
+				dropIndicator.visible = false;
+			}
+			
+			protected function mainView_dragExitHandler(event:DragEvent):void {
+				dropIndicator.includeInLayout = false;
+				dropIndicator.visible = false;
+			}
+			
+			public var invokedFile:File;
+			
+			/**
+			 * Invoked file.
+			 * */
+			public function invokeWithFile(currentDirectory:File, invokedArguments:Array = null):void {
+				var filePath:String = invokedArguments && invokedArguments.length ? invokedArguments[0] : null;
+				var fileData:String;
+				var fileStream:FileStream;
+				var file:File;
+				
+				if (filePath) {
+					try {
+						file = new File(filePath);
+					}
+					catch (errorEvent:*) {
+						trace("Error: " + errorEvent.toString());
+						return;
+					}
+					
+					if (file && 
+						file.exists && 
+						file.isDirectory==false && 
+						file.extension) {
+						
+						if (file.extension.toLowerCase()!="mxml" || file.extension.toLowerCase()!="txt") {
+							trace("Not accepted file format");
+						}
+						
+						try {
+							fileStream = new FileStream();
+							fileStream.open(file, FileMode.READ);
+							
+							if (fileStream.bytesAvailable) {
+								fileData = fileStream.readUTFBytes(fileStream.bytesAvailable);
+								
+								mainView.setEditorText(fileData, true, true);
+							}
+						}
+						catch (error:*) {
+							
+						}
+					}
+				}
+			}
+			
+			protected function dropIndicator_clickHandler(event:MouseEvent):void {
+				dropIndicator.visible = false;
+				dropIndicator.includeInLayout = false;
+			}
 		]]>
 	</fx:Script>
 	
@@ -40,6 +195,17 @@
 		</handlers:EventHandler>
 	</fx:Declarations>
 	
-	<local:MXMLAzzurroMainView width="100%" height="100%"/>
+	<local:MXMLAzzurroMainView id="mainView" width="100%" height="100%"/>
+	
+	<s:BorderContainer id="dropIndicator" 
+					   width="100%" height="100%" 
+					   includeInLayout="false" visible="false"
+					   click="dropIndicator_clickHandler(event)"
+					   >
+		<s:backgroundFill>
+			<s:SolidColor color="#8888FF" alpha="1"/>
+		</s:backgroundFill>
+		<s:Label text="Drop MXML documents here" horizontalCenter="0" verticalCenter="0" fontSize="44"/>
+	</s:BorderContainer>
 	
 </s:WindowedApplication>

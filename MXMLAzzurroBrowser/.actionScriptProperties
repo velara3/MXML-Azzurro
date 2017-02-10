@@ -17,6 +17,7 @@
   </compiler>
   <applications>
     <application path="MXMLAzzurroBrowser.mxml"/>
+    <application path="MXMLAzzurroViewer.mxml"/>
   </applications>
   <modules/>
   <workers/>

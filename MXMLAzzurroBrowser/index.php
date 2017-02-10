@@ -27,7 +27,7 @@
     Learn more about Flex at http://flex.apache.org 
     // -->
     <head>
-        <title>${title}</title>
+        <title></title>
         <meta name="google" value="notranslate" />         
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
         <!-- Include CSS to eliminate any default margins/padding and set the height of the html element and 
@@ -39,16 +39,16 @@
         <style type="text/css" media="screen"> 
             html, body  { height:100%; }
             body { margin:0; padding:0; overflow:auto; text-align:center; 
-                   background-color: ${bgcolor}; -webkit-font-smoothing: subpixel-antialiased;}   
+                   background-color: #ffffff; -webkit-font-smoothing: subpixel-antialiased;}   
             object:focus { outline:none; }
             #flashContent { display:none; }
         </style>
         
         <!-- Enable Browser History by replacing useBrowserHistory tokens with two hyphens -->
-        <!-- BEGIN Browser History required section ${useBrowserHistory}>
+        <!-- BEGIN Browser History required section -->
         <link rel="stylesheet" type="text/css" href="history/history.css" />
         <script type="text/javascript" src="history/history.js"></script>
-        <!${useBrowserHistory} END Browser History required section -->  
+        <!-- END Browser History required section -->  
         
         <script src="src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
         <script src="src-min-noconflict/ext-language_tools.js" type="text/javascript" charset="utf-8"></script>
@@ -58,22 +58,22 @@
         <script type="text/javascript" src="swfobject.js"></script>
         <script type="text/javascript">
             // For version detection, set to min. required Flash Player version, or 0 (or 0.0.0), for no version detection. 
-            var swfVersionStr = "${version_major}.${version_minor}.${version_revision}";
+            var swfVersionStr = "23.0.0";
             // To use express install, set to playerProductInstall.swf, otherwise the empty string. 
-            var xiSwfUrlStr = "${expressInstallSwf}";
+            var xiSwfUrlStr = "expressInstall.swf";
             var flashvars = {};
             var params = {};
             params.quality = "high";
-            params.bgcolor = "${bgcolor}";
+            params.bgcolor = "#ffffff";
             params.allowscriptaccess = "sameDomain";
             params.allowfullscreen = "true";
             var attributes = {};
-            attributes.id = "${application}";
-            attributes.name = "${application}";
+            attributes.id = "MXMLAzzurroViewer";
+            attributes.name = "MXMLAzzurroViewer";
             attributes.align = "middle";
             swfobject.embedSWF(
-                "${swf}.swf", "flashContent", 
-                "${width}", "${height}", 
+                "MXMLAzzurroViewer.swf", "flashContent", 
+                "100%", "100%", 
                 swfVersionStr, xiSwfUrlStr, 
                 flashvars, params, attributes);
             // JavaScript enabled so display the flashContent div in case it is not replaced with a swf object.
@@ -94,7 +94,7 @@
         <div id="flashContent">
             <p>
                 To view this page ensure that Adobe Flash Player version 
-                ${version_major}.${version_minor}.${version_revision} or greater is installed. 
+                23.0.0 or greater is installed. 
             </p>
             <script type="text/javascript"> 
                 var pageHost = ((document.location.protocol == "https:") ? "https://" : "http://"); 
@@ -104,23 +104,23 @@
         </div>
         
         <noscript>
-            <object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" width="${width}" height="${height}" id="${application}">
-                <param name="movie" value="${swf}.swf" />
+            <object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" width="100%" height="100%" id="MXMLAzzurroViewer">
+                <param name="movie" value="MXMLAzzurroViewer.swf" />
                 <param name="quality" value="high" />
-                <param name="bgcolor" value="${bgcolor}" />
+                <param name="bgcolor" value="#ffffff" />
                 <param name="allowScriptAccess" value="sameDomain" />
                 <param name="allowFullScreen" value="true" />
                 <!--[if !IE]>-->
-                <object type="application/x-shockwave-flash" data="${swf}.swf" width="${width}" height="${height}">
+                <object type="application/x-shockwave-flash" data="MXMLAzzurroViewer.swf" width="100%" height="100%">
                     <param name="quality" value="high" />
-                    <param name="bgcolor" value="${bgcolor}" />
+                    <param name="bgcolor" value="#ffffff" />
                     <param name="allowScriptAccess" value="sameDomain" />
                     <param name="allowFullScreen" value="true" />
                 <!--<![endif]-->
                 <!--[if gte IE 6]>-->
                     <p> 
                         Either scripts and active content are not permitted to run or Adobe Flash Player version
-                        ${version_major}.${version_minor}.${version_revision} or greater is not installed.
+                        23.0.0 or greater is not installed.
                     </p>
                 <!--<![endif]-->
                     <a href="http://www.adobe.com/go/getflashplayer">
@@ -132,12 +132,15 @@
             </object>
         </noscript>     
    </body>
+   
+<script id="fxt" type="text/xml"><?php 
+if (isset($_REQUEST["source"])) {
+	echo $_REQUEST["source"];
+}?></script>
 
-<script id="fxt" type="text/xml"></script>
-
-<script id="fx" type="text/xml">
+<script id="testFXT" type="text/xml">
 	<s:Application xmlns:s="library://ns.adobe.com/flex/spark" minWidth="10" minHeight="10">
-		<s:Label id="renderTimeLabel" text="hello world" color="#686868" horizontalCenter="0" verticalCenter="0"/>
+		<s:Label text="hello world" color="#686868" horizontalCenter="0" verticalCenter="0"/>
 	</s:Application>
 </script>
 

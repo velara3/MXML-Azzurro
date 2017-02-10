@@ -6,10 +6,9 @@
 			   pageTitle="Example" fc:version="2.2.0" 
 			   width="100%">
 			   
-	<s:Label x="34" y="45" text="Components" fontWeight="bold" fontSize="33"/>
-	<s:Label x="453" y="45" text="Layout" fontWeight="bold" fontSize="33"/>
-	<s:Label right="10" y="45" text="Apache Flex" fontWeight="normal" fontSize="10"/>
-			   
+	<s:Label x="34" y="45" text="Components" fontWeight="bold" fontSize="22"/>
+	<s:Label x="453" y="45" text="Layout" fontWeight="bold" fontSize="22"/>
+	
 	<s:TileGroup x="35" columnWidth="148" horizontalGap="10" width="240" horizontalAlign="left" 
 				 columnAlign="left" verticalAlign="middle" height="166" requestedColumnCount="2" y="107">
 		<s:Label text="Button" verticalAlign="middle"/>
@@ -47,30 +46,37 @@
 		<s:Spacer x="-426" height="16" width="16" y="101"/>
 	</s:TileGroup>
 	
-	
-	<s:BorderContainer x="447" height="400" width="261" y="91" backgroundColor="#F6F6F6" fc:convertToImage="true">
-		<s:Group x="10" height="160" width="240" y="10">
-			<s:Label x="2" y="2" text="Top=0&#10;Left=0" top="0" left="0"/>
-			<s:Label x="2" y="2" text="Right=0&#10;Bottom=0" bottom="0" right="0"/>
-			<s:Label x="2" y="2" text="Vertical Center=0&#10;Horizontal Center=0" horizontalCenter="0" verticalCenter="0"/>
-			<s:Label y="2" text="Left=0&#10;Bottom=0" bottom="0" left="0"/>
-			<s:Label x="2" y="2" text="Top=0&#10;Right=0" top="0" right="0"/>
-			<s:Label x="92" y="2" text="Group" horizontalCenter="0" fontWeight="bold"/>
+	<s:BorderContainer x="447" height="190" width="261" y="91" backgroundColor="#F6F6F6" fc:convertToImage="true">
+		<s:Group x="10" height="160" width="240" y="10" fontSize="10">
+			<s:Label text="Top=0&#10;Left=0" top="0" left="0"/>
+			<s:Label text="Right=0&#10;Bottom=0" bottom="0" right="0"/>
+			<s:Label text="Vertical Center=0&#10;Horizontal Center=0" horizontalCenter="0" verticalCenter="0"/>
+			<s:Label text="Left=0&#10;Bottom=0" bottom="0" left="0"/>
+			<s:Label text="Top=0&#10;Right=0" top="0" right="0"/>
+			<s:Label text="Constraints" horizontalCenter="0" fontWeight="bold"/>
 		</s:Group>
-		<s:VGroup minHeight="20" x="100" minWidth="20" y="245">
-			<s:Label x="425" y="178" text="VGroup" lineHeight="183%" fontWeight="bold"/>
-			<s:Label y="90" text="Label"/>
-			<s:Label y="90" text="Label"/>
-			<s:Label y="90" text="Label"/>
-			<s:Label y="90" text="Label"/>
-		</s:VGroup>
-		<s:HGroup minHeight="20" verticalAlign="middle" x="26" minWidth="20" y="203">
-			<s:Label name="HGroup Label" id="hgroup_label" text="HGroup" fontWeight="bold"/>
-			<s:Label text="Label"/>
-			<s:Label text="Label"/>
-			<s:Label x="389" y="60" text="Label"/>
-			<s:Label text="Label"/>
-		</s:HGroup>
 	</s:BorderContainer>
 	
+	<s:HGroup minHeight="20" verticalAlign="middle" x="447" minWidth="20" y="303">
+		<s:Label name="HGroup" id="hgroup_label" text="HGroup" fontWeight="bold"/>
+		<s:Label text="Label"/>
+		<s:Label text="Label"/>
+		<s:Label text="Label"/>
+		<s:Label text="Label"/>
+	</s:HGroup>
+	
+	<s:VGroup minHeight="20" x="447" minWidth="20" y="345">
+		<s:Label text="VGroup" lineHeight="183%" fontWeight="bold"/>
+		<s:Label text="Label"/>
+		<s:Label text="Label"/>
+	</s:VGroup>
+	
+	<s:TileGroup x="588" y="345" horizontalGap="10" width="240" horizontalAlign="left" 
+				 columnAlign="left" verticalAlign="middle" height="166" requestedColumnCount="2" >
+		<s:Label text="TileLayout" verticalAlign="middle" fontWeight="bold" />
+		<s:Label text="Item 1" verticalAlign="middle"/>
+		<s:Label text="Item 2" verticalAlign="middle"/>
+		<s:Label text="Item 3" verticalAlign="middle"/>
+		<s:Label text="Item 4" verticalAlign="middle"/>
+	</s:TileGroup>
 </s:Application>
