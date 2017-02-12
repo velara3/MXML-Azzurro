@@ -6,7 +6,7 @@
 			   xmlns:local="*"
 			   minWidth="755" minHeight="200" pageTitle="MXML Azzurro"
 			   preinitialize="application1_initializeHandler(event)"
-			   viewSourceURL="srcview/index.html">
+			   >
 	
 	<fx:Script>
 		<![CDATA[
@@ -30,13 +30,13 @@
 			 *  x add save command
 			 *  - add side column list of posts 
 			 *  x move the issues column to left of editor
-			 *  - add color theme
+			 *  - add color theme setting
 			 *  x hide gutter
 			 *  x use plain css 
 			 *  x sort class list suggestions
 			 *  - create better UI design
 			 *  - add html preview 
-			 *  - add custom url
+			 *  x add custom url
 			 * 
 			 * MXML Previewer
 			 *  x create MXML only preview

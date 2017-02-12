@@ -3,10 +3,10 @@
 An online and desktop MXML editor and viewer for Apache Flex SDK. Edit MXML live in the browser and see it rendered live. Save and share MXML documents. 
 
 Home page:
- - Editor - https://www.radii8.com/mxml/ 
- - Viewer - https://www.radii8.com/viewer/
- - Blog - https://www.radii8.com/blog 
- - Products - https://www.radii8.com/products
+ - Editor   - https://www.radii8.com/mxml/ 
+ - Viewer   - https://www.radii8.com/viewer/
+ - Blog     - https://www.radii8.com/blog 
+ - Products - https://www.radii8.com/blog/?page_id=108
  
 Notes:  
  This application uses the following components.  

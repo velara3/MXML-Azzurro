@@ -103,6 +103,9 @@
 			public var updateNeededTime:int;
 			public var renderDeltaChanges:Boolean;
 			public var viewRendered:Boolean;
+			public var lastURL:String;
+			public var lastFragment:String;
+			public var currentURL:String;
 			
 			public var debug:Boolean;
 			
@@ -118,9 +121,12 @@
 			public var loadingEditor:Boolean;
 			
 			protected function view_creationCompleteHandler(event:FlexEvent):void {
+				var renderCommand:AceCommand;
+				var textFlowParser:ITextImporter;
+				
 				//parentApplication.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, uncaughtErrorHandler);
 				Radiate.preventDefaultMessages = false;
-				ExternalInterface.marshallExceptions = false;
+				ExternalInterface.marshallExceptions = true;
 				AceEditor.debug = false;
 				
 				ClassLoader.debug = debug;
@@ -137,9 +143,11 @@
 				
 				//aceEditor.addCommand(new AceCommand("find", {win: "Ctrl-B", "mac": "Cmd-B"}, findKeyboardHandler));
 				aceEditor.addCommand(new AceCommand("save", {win: "Ctrl-S", "mac": "Cmd-S"}, saveKeyboardHandler));
-				var renderCommand:AceCommand = new AceCommand("render");
+				
+				renderCommand = new AceCommand("render");
 				renderCommand.bindKey =  {win: "Ctrl-Enter", "mac": "Cmd-Enter"};
 				renderCommand.exec =  renderKeyboardHandler;
+				
 				aceEditor.addCommand(renderCommand);
 				
 				aceEditor.blur();
@@ -147,10 +155,9 @@
 				if (Platform.isBrowser) {
 					editorMargin = "0";
 				}
+				editorMargin = "0";
 				
 				Property.errorHandler = propertyErrorHandler;
-				
-				var textFlowParser:ITextImporter;
 				
 				textFlowParser = TextConverter.getImporter(TextConverter.TEXT_LAYOUT_FORMAT, null);
 				textFlowParser.throwOnError = false;
@@ -163,6 +170,17 @@
 				toggles.push(showIssuesButton);
 				
 				setupSnippets();
+				
+				host = "https://www.radii8.com/snippets/";
+				editorHost = "https://www.radii8.com/mxml/";
+				viewerHost = "https://www.radii8.com/viewer/";
+				
+				if (ExternalInterface.available) {
+					currentURL = ExternalInterface.call(getURL);
+				}
+				else {
+					currentURL = host.replace("snippets", "mxml");
+				}
 			}
 			
 			public function propertyErrorHandler(property:Property, value:Object):void {
@@ -195,6 +213,7 @@
 			public function saveKeyboardHandler(editor:Object=null, event:Object=null):void {
 				//trace("save keyboard event");
 				if (debug) trace("saved");
+				saveDocumentButton_clickHandler();
 			}
 			
 			protected function uncaughtErrorHandler(event:UncaughtErrorEvent):void {
@@ -293,8 +312,6 @@
 				Radiate.initialize();
 				
 				//host = Radiate.getWPHostURL();
-				host = "https://www.radii8.com/snippets/";
-				viewerHost = "https://www.radii8.com/viewer/";
 				
 				if (!Platform.isBrowser) {
 					Radiate.addComponentDefinition("WindowedApplication", "spark.components.WindowedApplication", WindowedApplication);
@@ -303,8 +320,8 @@
 					Radiate.addComponentDefinition("Application", "spark.components.Application", Application);
 				}
 				
-				Radiate.addComponentDefinition("VDividedBox", "mx.components.VDividedBox", VDividedBox);
-				Radiate.addComponentDefinition("HDividedBox", "mx.components.HDividedBox", HDividedBox);
+				//Radiate.addComponentDefinition("VDividedBox", "mx.components.VDividedBox", VDividedBox);
+				//Radiate.addComponentDefinition("HDividedBox", "mx.components.HDividedBox", HDividedBox);
 				
 				// only update on save keyboard shortcut or on change
 				updateOnSave = false;
@@ -522,11 +539,11 @@
 				applicationLoader.createCleanApplication()
 				//setEditorText(selectedSnippet.source);
 				aceEditor.validateNow();
-				aceEditor.resetUndoHistory();
 				//examplesList.selectedItem = null;
 				examplesList.validateNow();
 				//callLater(invalidateDesignView);
 				pendingCode = selectedSnippet.source;
+				//aceEditor.resetUndoHistory();
 			}
 			
 			public function showMessage(firstMessage:String, secondMessage:String = "", row:int = -1, column:int = 0, updateIssues:Boolean = true):void {
@@ -567,6 +584,7 @@
 				//Radiate.setTarget(iDocument.instance);
 				if (pendingCode) {
 					aceEditor.text = pendingCode;
+					aceEditor.resetUndoHistory();
 					pendingCode = null;
 				}
 				invalidateDesignView();
@@ -850,20 +868,31 @@
 				var error:Object;
 				var code:String;
 				var time:int;
+				var showBrowserMessage:Boolean;
 				
 				if (loadingEditor) return;
 				
+				showBrowserMessage = true;
 				code = aceEditor.text;
-				//PerformanceMeter.mark("Before xml validation", true);
-				isValid = XMLUtils.isValidXML(code);
-				//PerformanceMeter.mark("After xml validation");
-				//error = XMLUtils.validationError;
 				
-				if (!isValid && code!="") {
+				if (!updateOnSave) {
+					//PerformanceMeter.mark("Before xml validation", true);
+					isValid = XMLUtils.isValidXML(code);
+					//PerformanceMeter.mark("After xml validation");
+					//error = XMLUtils.validationError;
+				}
+				
+				if (!updateOnSave && !isValid && code!="") {
 					time = getTimer();
 					validationInfo = XMLUtils.validateXML(code, true, true);
 					time = getTimer()-time;
-					message = XMLUtils.validationError ? "" +  validationInfo.internalErrorMessage : warningMessage;
+					
+					if (showBrowserMessage) {
+						message = XMLUtils.validationError ? "" +  validationInfo.specificErrorMessage : warningMessage;
+					}
+					else {
+						message = XMLUtils.validationError ? "" +  validationInfo.internalErrorMessage : warningMessage;
+					}
 					errorLocation = "At line " + (validationInfo.row) + " column " + validationInfo.column+ ":";
 					showMessage(errorLocation, message, validationInfo.row-1, validationInfo.column);
 					renderTimeLabel.text = "Validation time "+ time + "ms";
@@ -1013,6 +1042,7 @@
 			
 			private var host:String;
 			private var viewerHost:String;
+			private var editorHost:String;
 			
 			private var loadService:WPService;
 			private var saveService:WPService;
@@ -1082,6 +1112,8 @@
 				var post:Object = data ? data.post : null;
 				var pathElements:Array;
 				var key:String;
+				var uri:String;
+				var status:String;
 				
 				saveResultsEvent.call = event.call;
 				saveResultsEvent.data = event.data;
@@ -1089,19 +1121,23 @@
 				saveResultsEvent.text = event.text;
 				
 				if (post) {
-					var uri:String = post.url;
-					var status:String = post.status;
+					uri = post.url;
+					status = post.status;
 					savingStatus.text = "Snippet saved";
 					
 					//pathElements = uri.split("/");
 					//key = pathElements[pathElements.length-2];
 					var result:Array = uri.match(/(\w+)\/?$/);
-					if (result!=null) {
+					if (result!=null) {https://www.radii8.com/snippets/#Ewv0zaZ
 						browserManager.setFragment(result[1]);
+						lastFragment = result[1];
 					}
 					else {
 						browserManager.setFragment(post.id);
+						lastFragment = id;
 					}
+					
+					lastURL = uri;
 					
 					saveSuccessful = true;
 				}
@@ -1400,12 +1436,11 @@
 				
 				if (ExternalInterface.available) {
 					var fragment:String = browserManager.fragment;
-					var currentURL:String;
 					var viewerURL:String;
 					var request:URLRequest;
 					var object:URLVariables;
 					
-					currentURL = ExternalInterface.call(getURL);
+					//currentURL = ExternalInterface.call(getURL);
 					//viewerURL = currentURL.replace("/mxml/", "/viewer/");
 					
 					if (fragment!="") {
@@ -1423,23 +1458,33 @@
 						navigateToURL(request);
 					}
 				}
+				else {
+					if (lastFragment!="" && lastFragment!=null) {
+						viewerURL = viewerHost + "#" + lastFragment;
+						request = new URLRequest(viewerURL);
+						navigateToURL(request);
+					}
+				}
 				
 			}
 			
 			protected function shareDocumentButton_clickHandler(event:MouseEvent):void {
 				aceEditor.visible = false;
-				var viewerURL:String;
-				var currentURL:String;
 				
 				if (shareCallout.isOpen) {
 					shareCallout.close();
 				}
 				else {
-					currentURL = ExternalInterface.call(getURL);
-					viewerURL = currentURL.replace("/mxml/", "/viewer/");
-					shareCallout.url = currentURL;
-					shareCallout.viewerURL = viewerURL;
-					shareCallout.open(shareDocumentButton, true);
+					if (ExternalInterface.available) {
+						shareCallout.url = editorHost + "#" + lastFragment;
+						shareCallout.viewerURL = viewerHost + "#" + lastFragment;
+						shareCallout.open(shareDocumentButton, true);
+					}
+					else if (saveSuccessful) {
+						shareCallout.url = editorHost + "#" + lastFragment;
+						shareCallout.viewerURL = viewerHost + "#" + lastFragment;
+						shareCallout.open(shareDocumentButton, true);
+					}
 				}
 			}
 			
@@ -1453,7 +1498,7 @@
 			}
 			
 			
-			protected function saveDocumentButton_clickHandler(event:MouseEvent):void {
+			protected function saveDocumentButton_clickHandler(event:MouseEvent = null):void {
 				aceEditor.visible = false;
 				
 				if (saveCallout.isOpen) {
@@ -1702,6 +1747,7 @@
 						height="50%"
 						width="100%" 
 						horizontalScrollPolicy="off"
+						horizontalGap="6"
 						updateComplete="hdividedbox1_dividerReleaseHandler(event)">
 			
 		<!--<s:HGroup id="aceEditorDividedBox" left="15" 
