@@ -11,6 +11,7 @@
 	<fx:Script>
 		<![CDATA[
 			import com.flexcapacitor.events.HTMLDragEvent;
+			import com.flexcapacitor.events.RedirectEvent;
 			import com.flexcapacitor.utils.DisplayObjectUtils;
 			
 			import mx.events.FlexEvent;
@@ -111,6 +112,19 @@
 				dropIndicator.includeInLayout = false;
 			}
 			
+			protected function secureredirect1_redirectingHandler(event:RedirectEvent):void {
+				//trace("Redirecting");
+				//event.preventDefault();
+			}
+			
+			protected function secureredirect1_redirectionRecommendationHandler(event:RedirectEvent):void {
+				//trace("Redirect recommended:" + event.redirectRecommended);
+				var secureRedirect:SecureRedirect = event.currentTarget as SecureRedirect;
+				if (event.redirectRecommended) {
+					//secureRedirect.redirectToHTTPS();
+				}
+			}
+			
 		]]>
 	</fx:Script>
 	
@@ -123,6 +137,12 @@
 							   dragOver="htmldragmanager1_dragOverHandler(event)" 
 							   dragExit="htmldragmanager1_dragExitHandler(event)" 
 							   />
+		
+		<utils:SecureRedirect id="secureRedirect" 
+							  doNotRedirectFromUnsecuredLocalhost="true"
+							  redirecting="secureredirect1_redirectingHandler(event)"
+							  redirectionRecommendation="secureredirect1_redirectionRecommendationHandler(event)"/>
+		
 		<fx:String>
 		<![CDATA[[
 			

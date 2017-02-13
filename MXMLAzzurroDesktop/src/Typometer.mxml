@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   xmlns:controls="com.flexcapacitor.controls.*"
+					   xmlns:utils="com.flexcapacitor.utils.*"
+					   frameRate="20" 
+					   >
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.HTML;
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<utils:MiniInspector />
+	</fx:Declarations>
+	
+	
+	
+	
+	<controls:AceEditor id="aceEditor" 
+						width="100%" 
+						height="100%"
+						mode="ace/mode/text" 
+						showFoldWidgets="false" 
+						scrollSpeed=".5"
+						useWordWrap="false"
+						showGutter="false"
+						airClass="{HTML}"
+						/>
+</s:WindowedApplication>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" 
+			   xmlns:controls="com.flexcapacitor.controls.*"
+			   minWidth="55" 
+			   minHeight="10" 
+			   frameRate="60"
+			   >
+
+	
+	
+	
+	<controls:AceEditor id="aceEditor" 
+						width="100%" 
+						height="100%"
+						mode="ace/mode/text" 
+						showFoldWidgets="false" 
+						scrollSpeed=".5"
+						useWordWrap="false"
+						showGutter="false"
+						/>
+</s:Application>
