@@ -71,6 +71,7 @@
             attributes.id = "MXMLAzzurroViewer";
             attributes.name = "MXMLAzzurroViewer";
             attributes.align = "middle";
+            attributes.wmode = "opaque"; // for IE
             swfobject.embedSWF(
                 "MXMLAzzurroViewer.swf", "flashContent", 
                 "100%", "100%", 
