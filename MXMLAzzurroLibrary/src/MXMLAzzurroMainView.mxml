@@ -181,6 +181,14 @@
 				else {
 					currentURL = host.replace("snippets", "mxml");
 				}
+				
+				
+				if (examplesService==null) {
+					examplesService = new WPService();
+					examplesService.addEventListener(WPService.RESULT, getExampleProjectsResultsHandler, false, 0, true);
+					examplesService.addEventListener(WPService.FAULT, getExampleProjectsFaultHandler, false, 0, true);
+					examplesService.host = host;
+				}
 			}
 			
 			public function propertyErrorHandler(property:Property, value:Object):void {
@@ -678,13 +686,6 @@
 				}
 				
 				callLater(showExamples);
-				
-				if (examplesService==null) {
-					examplesService = new WPService();
-					examplesService.addEventListener(WPService.RESULT, getExampleProjectsResultsHandler, false, 0, true);
-					examplesService.addEventListener(WPService.FAULT, getExampleProjectsFaultHandler, false, 0, true);
-					examplesService.host = host;
-				}
 				
 			}
 			
@@ -1474,14 +1475,20 @@
 					shareCallout.close();
 				}
 				else {
+					if (lastFragment==null) {
+						lastFragment = "";
+					}
+					
 					if (ExternalInterface.available) {
 						shareCallout.url = editorHost + "#" + lastFragment;
 						shareCallout.viewerURL = viewerHost + "#" + lastFragment;
+						shareCallout.code = aceEditor.text;
 						shareCallout.open(shareDocumentButton, true);
 					}
 					else if (saveSuccessful) {
 						shareCallout.url = editorHost + "#" + lastFragment;
 						shareCallout.viewerURL = viewerHost + "#" + lastFragment;
+						shareCallout.code = aceEditor.text;
 						shareCallout.open(shareDocumentButton, true);
 					}
 				}
@@ -1543,8 +1550,13 @@
 			}
 			
 			protected function examplesList_doubleClickHandler(event:MouseEvent):void {
-				var count:int = 100;
-				examplesService.getPosts(null, null, count);				
+				var count:int = 200;
+				examplesService.getPosts(null, null, count);
+			}
+			
+			protected function getExamples_clickHandler(event:MouseEvent):void {
+				var count:int = 200;
+				examplesService.getPosts(null, null, count);
 			}
 			
 		]]>
@@ -1747,6 +1759,7 @@
 						width="100%" 
 						horizontalScrollPolicy="off"
 						horizontalGap="6"
+						liveDragging="true"
 						updateComplete="hdividedbox1_dividerReleaseHandler(event)">
 			
 		<!--<s:HGroup id="aceEditorDividedBox" left="15" 
@@ -1769,19 +1782,34 @@
 						 visible="{issuesInspector.listCollection.length==0}"/>
 			</s:Group>
 			
-			<s:Group id="examplesGroup" height="100%" includeIn="examples" itemCreationPolicy="immediate" width="200">
+			<s:Group id="examplesGroup" height="100%" 
+					 includeIn="examples" itemCreationPolicy="immediate" width="200">
 				<s:List id="examplesList" 
 						width="100%" height="100%"
 						doubleClickEnabled="true" 
 						labelField="name"
 						top="0"
-						bottom="0"
+						bottom="24"
 						doubleClick="examplesList_doubleClickHandler(event)"
 						change="examplesList_changeHandler(event)"
 						click="examplesList_changeHandler(event)"
 						>
 				</s:List>
-					
+				
+				
+				<s:Label bottom="0" 
+						 text="Get Community Examples" 
+						 color="#Ffffff" 
+						 height="18"
+						 backgroundColor="#e8e8e8"
+						 backgroundAlpha="1"
+						 fontWeight="normal"
+						 verticalAlign="middle"
+						 textAlign="center"
+						 width="100%"
+						 useHandCursor="true"
+						 click="getExamples_clickHandler(event)"/>
+				
 				<s:Label y="25" 
 						 text="No examples" 
 						 color="#787878" 

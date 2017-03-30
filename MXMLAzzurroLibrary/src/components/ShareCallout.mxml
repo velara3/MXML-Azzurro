@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<s:Callout xmlns:fx="http://ns.adobe.com/mxml/2009" 
+<controls:Callout xmlns:fx="http://ns.adobe.com/mxml/2009" 
 		   xmlns:s="library://ns.adobe.com/flex/spark" 
 		   xmlns:clipboard="com.flexcapacitor.effects.clipboard.*" 
 		   xmlns:navigation="com.flexcapacitor.effects.navigation.*"
@@ -16,7 +16,8 @@
 		   updateComplete="callout1_updateCompleteHandler(event)"
 		   contentBackgroundAppearance="flat"
            horizontalPosition="middle"
-           verticalPosition="before"
+           verticalPosition="before" 
+		   xmlns:controls="com.flexcapacitor.controls.*"
 		   >
 	<!--
 	Using effects would cause the callout to fade out immediately after a second call.
@@ -39,6 +40,7 @@
 			
 			public var url:String;
 			public var viewerURL:String;
+			public var code:String;
 			
 			protected function creationCompleteHandler(event:FlexEvent):void {
 				//trace("Callout created");
@@ -73,6 +75,13 @@
 				close();
 			}
 			
+			protected function copyCodeButton_clickHandler(event:MouseEvent):void {
+				var clipboard:Clipboard = Clipboard.generalClipboard;
+				clipboard.clear();
+				clipboard.setData(ClipboardFormats.TEXT_FORMAT, code, false);
+				close();
+			}
+			
 			protected function openInViewer_clickHandler(event:MouseEvent):void
 			{
 				var request:URLRequest = new URLRequest(viewerURL);
@@ -88,9 +97,9 @@
 		
 	</fx:Declarations>
 	
-	<s:layout>
+	<controls:layout>
 		<s:VerticalLayout paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10"/>
-	</s:layout>
+	</controls:layout>
     
 	<s:Button id="copyURLButton" 
 			  label="Copy URL to Clipboard" 
@@ -106,6 +115,14 @@
 			  width="100%"
 			  styleName="sliderLabel" 
 			  click="copyURLToViewerButton_clickHandler(event)"
+			  />
+	
+	<s:Button id="copyMXMLButton" 
+			  label="Copy code to Clipboard" 
+			  height="60" 
+			  width="100%"
+			  styleName="sliderLabel" 
+			  click="copyCodeButton_clickHandler(event)"
 			  />
 	
 	<!--<s:Button id="openInViewer" 
@@ -124,4 +141,4 @@
 			  click="close()"
 			  />
 
-</s:Callout>
+</controls:Callout>
